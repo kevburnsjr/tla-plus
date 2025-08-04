@@ -1,0 +1,6 @@
+bin
+mod-distribution
+states
+*.zip
+*.jar
+*.out
