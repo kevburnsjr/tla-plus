@@ -14,6 +14,10 @@ wire:
 	@java -cp tla2tools.jar pcal.trans practical-tla-plus/wire.tla
 	@java -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/wire.cfg -workers auto -cleanup practical-tla-plus/wire.tla
 
+recycler:
+	@java -cp tla2tools.jar pcal.trans practical-tla-plus/recycler.tla
+	@java -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/recycler.cfg -workers auto -cleanup practical-tla-plus/recycler.tla
+
 trans:
 	@echo "java -cp tla2tools.jar pcal.trans -h"
 
