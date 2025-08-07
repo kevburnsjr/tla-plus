@@ -20,14 +20,18 @@ begin
             with msg \in in_transit do
                 received := Append(received, msg);
                 in_transit := in_transit \ {msg};
-                can_send := TRUE;
+                either
+                    can_send := TRUE;
+                or
+                    skip;
+                end either;
             end with;
         or
             skip;
         end either;
     end while;
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "f5f82fdf" /\ chksum(tla) = "b2048aee")
+\* BEGIN TRANSLATION (chksum(pcal) = "69af103a" /\ chksum(tla) = "f2f9acf2")
 VARIABLES to_send, received, in_transit, can_send, pc
 
 vars == << to_send, received, in_transit, can_send, pc >>
@@ -58,7 +62,9 @@ Lbl_2 == /\ pc = "Lbl_2"
          /\ \E msg \in in_transit:
               /\ received' = Append(received, msg)
               /\ in_transit' = in_transit \ {msg}
-              /\ can_send' = TRUE
+              /\ \/ /\ can_send' = TRUE
+                 \/ /\ TRUE
+                    /\ UNCHANGED can_send
          /\ pc' = "Lbl_1"
          /\ UNCHANGED to_send
 
