@@ -15,10 +15,11 @@ variables
     curr = "";
 
 define
-    NoBinOverflow ==
-        capacity.trash >= 0 /\ capacity.recycle >= 0
-    CountsMatchUp ==
-        Len(bins.trash) = count.trash /\ Len(bins.recycle) = count.recycle
+    Invariant ==
+        /\ capacity.trash >= 0
+        /\ capacity.recycle >= 0
+        /\ Len(bins.trash) = count.trash
+        /\ Len(bins.recycle) = count.recycle
 end define;
 
 macro add_item(type) begin
@@ -38,16 +39,17 @@ begin
         end if;
     end while;
 
-    assert NoBinOverflow /\ CountsMatchUp;
+    assert Invariant;
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "538cdb6" /\ chksum(tla) = "beb4ba82")
+\* BEGIN TRANSLATION (chksum(pcal) = "7721b11" /\ chksum(tla) = "4183d01")
 VARIABLES capacity, bins, count, items, curr, pc
 
 (* define statement *)
-NoBinOverflow ==
-    capacity.trash >= 0 /\ capacity.recycle >= 0
-CountsMatchUp ==
-    Len(bins.trash) = count.trash /\ Len(bins.recycle) = count.recycle
+Invariant ==
+    /\ capacity.trash >= 0
+    /\ capacity.recycle >= 0
+    /\ Len(bins.trash) = count.trash
+    /\ Len(bins.recycle) = count.recycle
 
 
 vars == << capacity, bins, count, items, curr, pc >>
@@ -76,8 +78,8 @@ Lbl_1 == /\ pc = "Lbl_1"
                                           /\ UNCHANGED << capacity, bins,
                                                           count >>
                     /\ pc' = "Lbl_1"
-               ELSE /\ Assert(NoBinOverflow /\ CountsMatchUp,
-                              "Failure of assertion at line 41, column 5.")
+               ELSE /\ Assert(Invariant,
+                              "Failure of assertion at line 42, column 5.")
                     /\ pc' = "Done"
                     /\ UNCHANGED << capacity, bins, count, items, curr >>
 
