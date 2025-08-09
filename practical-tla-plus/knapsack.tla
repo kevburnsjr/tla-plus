@@ -28,14 +28,12 @@ BestKnapsack(itemset) ==
         KnapsackValue(best, itemset) > KnapsackValue(worse, itemset)
 
 BestKnapsacks(itemset) ==
-    LET
-        value(sack) == KnapsackValue(sack, itemset)
+    LET value(sack) == KnapsackValue(sack, itemset)
         all == ValidKnapsacks(itemset)
         best == CHOOSE best \in all:
             \A worse \in all \ {best}:
                 value(best) >= value(worse)
-    IN
-        {k \in all: value(best) = value(k)}
+    IN {k \in all: value(best) = value(k)}
 
 (*--algorithm knapsack
 variables
@@ -43,7 +41,7 @@ variables
 begin
     assert BestKnapsacks(itemset) \subseteq ValidKnapsacks(itemset);
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "6d2365f" /\ chksum(tla) = "576d8a6e")
+\* BEGIN TRANSLATION (chksum(pcal) = "6d2365f" /\ chksum(tla) = "c591edf5")
 VARIABLES itemset, pc
 
 vars == << itemset, pc >>
@@ -54,7 +52,7 @@ Init == (* Global variables *)
 
 Lbl_1 == /\ pc = "Lbl_1"
          /\ Assert(BestKnapsacks(itemset) \subseteq ValidKnapsacks(itemset),
-                   "Failure of assertion at line 44, column 5.")
+                   "Failure of assertion at line 42, column 5.")
          /\ pc' = "Done"
          /\ UNCHANGED itemset
 
