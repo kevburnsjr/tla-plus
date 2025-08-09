@@ -1,13 +1,16 @@
---------------------------------- MODULE knapsack ---------------------------------
+------------------------------- MODULE knapsack --------------------------------
 
 EXTENDS Sequences, Integers, TLC
-
 PT == INSTANCE PT
 
-Capacity == 4
-Items == {"a", "b", "c"}
-ItemParams == [size: 2..4, value: 0..5]
-\* ItemSets == [a: ItemParams, b: ItemParams, c: ItemParams]
+CONSTANTS Capacity, Items,
+    SizeRangeMin, SizeRangeMax,
+    ValueRangeMin, ValueRangeMax
+
+ItemParams == [
+    size: SizeRangeMin..SizeRangeMax,
+    value: ValueRangeMin..ValueRangeMax
+]
 ItemSets == [Items -> ItemParams]
 
 KnapsackSize(sack, itemset) ==
@@ -15,7 +18,7 @@ KnapsackSize(sack, itemset) ==
     IN PT!ReduceSet(LAMBDA item, acc: size_for(item) + acc, Items, 0)
 
 ValidKnapsacks(itemset) ==
-    {sack \in [Items -> 0..4]: KnapsackSize(sack, itemset) <= Capacity}
+{sack \in [Items -> 0..4]: KnapsackSize(sack, itemset) <= Capacity}
 
 KnapsackValue(sack, itemset) ==
     LET value_for(item) == itemset[item].value * sack[item]
@@ -25,7 +28,7 @@ BestKnapsack(itemset) ==
     LET all == ValidKnapsacks(itemset)
     IN CHOOSE best \in all:
         \A worse \in all \ {best}:
-        KnapsackValue(best, itemset) > KnapsackValue(worse, itemset)
+            KnapsackValue(best, itemset) > KnapsackValue(worse, itemset)
 
 BestKnapsacks(itemset) ==
     LET value(sack) == KnapsackValue(sack, itemset)
@@ -41,26 +44,27 @@ variables
 begin
     assert BestKnapsacks(itemset) \subseteq ValidKnapsacks(itemset);
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "6d2365f" /\ chksum(tla) = "c591edf5")
+\* BEGIN TRANSLATION (chksum(pcal) = "6d2365f" /\ chksum(tla) = "34d01a35")
 VARIABLES itemset, pc
 
 vars == << itemset, pc >>
 
 Init == (* Global variables *)
-        /\ itemset \in ItemSets
-        /\ pc = "Lbl_1"
+    /\ itemset \in ItemSets
+    /\ pc = "Lbl_1"
 
-Lbl_1 == /\ pc = "Lbl_1"
-         /\ Assert(BestKnapsacks(itemset) \subseteq ValidKnapsacks(itemset),
-                   "Failure of assertion at line 42, column 5.")
-         /\ pc' = "Done"
-         /\ UNCHANGED itemset
+Lbl_1 ==
+    /\ pc = "Lbl_1"
+    /\ Assert(BestKnapsacks(itemset) \subseteq ValidKnapsacks(itemset),
+        "Failure of assertion at line 45, column 5.")
+    /\ pc' = "Done"
+    /\ UNCHANGED itemset
 
 (* Allow infinite stuttering to prevent deadlock on termination. *)
 Terminating == pc = "Done" /\ UNCHANGED vars
 
 Next == Lbl_1
-           \/ Terminating
+\/ Terminating
 
 Spec == Init /\ [][Next]_vars
 
@@ -68,6 +72,6 @@ Termination == <>(pc = "Done")
 
 \* END TRANSLATION
 
-===============================================================================
+================================================================================
 
 Practical TLA+ - Chapter 3
