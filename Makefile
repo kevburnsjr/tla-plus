@@ -22,6 +22,10 @@ telephone:
 	@java -cp tla2tools.jar pcal.trans practical-tla-plus/telephone.tla
 	@java -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/telephone.cfg -workers auto -cleanup practical-tla-plus/telephone.tla
 
+knapsack:
+	@java -cp tla2tools.jar pcal.trans practical-tla-plus/knapsack.tla
+	@java -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/knapsack.cfg -workers auto -cleanup practical-tla-plus/knapsack.tla
+
 trans:
 	@echo "java -cp tla2tools.jar pcal.trans -h"
 
