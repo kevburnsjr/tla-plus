@@ -14,10 +14,10 @@ KnapsackSize(sack, itemset) ==
     LET size_for(item) == itemset[item].size * sack[item]
     IN PT!ReduceSet(LAMBDA item, acc: size_for(item) + acc, Items, 0)
 
-ValidKnapsacks(itemset) == 
+ValidKnapsacks(itemset) ==
     {sack \in [Items -> 0..4]: KnapsackSize(sack, itemset) <= Capacity}
-        
-KnapsackValue(sack, itemset) == 
+
+KnapsackValue(sack, itemset) ==
     LET value_for(item) == itemset[item].value * sack[item]
     IN PT!ReduceSet(LAMBDA item, acc: value_for(item) + acc, Items, 0)
 
@@ -27,33 +27,23 @@ BestKnapsack(itemset) ==
         \A worse \in all \ {best}:
         KnapsackValue(best, itemset) > KnapsackValue(worse, itemset)
 
-BestKnapsacksOne(itemset) == 
-    LET all == ValidKnapsacks(itemset)
-    IN CHOOSE all_the_best \in SUBSET all:
-        \E good \in all_the_best:
-            /\ \A other \in all_the_best:
-                KnapsackValue(good, itemset) = KnapsackValue(other, itemset)
-            /\ \A worse \in all \ all_the_best:
-                KnapsackValue(good, itemset) > KnapsackValue(worse, itemset)
-
-BestKnapsacksTwo(itemset) == 
+BestKnapsacks(itemset) ==
     LET
+        value(sack) == KnapsackValue(sack, itemset)
         all == ValidKnapsacks(itemset)
         best == CHOOSE best \in all:
             \A worse \in all \ {best}:
-                KnapsackValue(best, itemset) >= KnapsackValue(worse, itemset)
-        value_of_best == KnapsackValue(best, itemset)
+                value(best) >= value(worse)
     IN
-        {k \in all: value_of_best = KnapsackValue(k, itemset)}
+        {k \in all: value(best) = value(k)}
 
 (*--algorithm knapsack
 variables
     itemset \in ItemSets;
 begin
-    \* assert BestKnapsack(itemset) \in ValidKnapsacks(itemset);
-    assert \A is \in ItemSets: BestKnapsacksTwo(is) = BestKnapsacksOne(is)
+    assert BestKnapsacks(itemset) \subseteq ValidKnapsacks(itemset);
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "b852ecd7" /\ chksum(tla) = "d6a45c12")
+\* BEGIN TRANSLATION (chksum(pcal) = "6d2365f" /\ chksum(tla) = "576d8a6e")
 VARIABLES itemset, pc
 
 vars == << itemset, pc >>
@@ -63,8 +53,8 @@ Init == (* Global variables *)
         /\ pc = "Lbl_1"
 
 Lbl_1 == /\ pc = "Lbl_1"
-         /\ Assert(\A is \in ItemSets: BestKnapsacksTwo(is) = BestKnapsacksOne(is), 
-                   "Failure of assertion at line 54, column 5.")
+         /\ Assert(BestKnapsacks(itemset) \subseteq ValidKnapsacks(itemset),
+                   "Failure of assertion at line 44, column 5.")
          /\ pc' = "Done"
          /\ UNCHANGED itemset
 
@@ -78,7 +68,7 @@ Spec == Init /\ [][Next]_vars
 
 Termination == <>(pc = "Done")
 
-\* END TRANSLATION 
+\* END TRANSLATION
 
 ===============================================================================
 
