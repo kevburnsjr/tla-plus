@@ -13,8 +13,8 @@ end define;
 process writer = "writer"
 begin Write:
     while TRUE do
+        await Len(queue) < MaxQueueSize;
         queue := Append(queue, "msg");
-        await Len(queue) <= MaxQueueSize;
     end while;
 end process;
 
@@ -29,7 +29,7 @@ begin Read:
 end process;
 
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "b1f3c9ae" /\ chksum(tla) = "5d359c18")
+\* BEGIN TRANSLATION (chksum(pcal) = "31e27fb6" /\ chksum(tla) = "8d3d0f6f")
 VARIABLE queue
 
 (* define statement *)
@@ -47,8 +47,8 @@ Init == (* Global variables *)
     /\ current_message = "none"
 
 writer ==
+    /\ Len(queue) < MaxQueueSize
     /\ queue' = Append(queue, "msg")
-    /\ Len(queue') <= MaxQueueSize
     /\ UNCHANGED current_message
 
 reader ==
