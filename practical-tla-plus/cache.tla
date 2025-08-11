@@ -10,7 +10,8 @@ ASSUME Actors /= {}
 (*--algorithm cache
 
 variables
-    resources_left = ResourceCap;
+    resource_cap \in 1..ResourceCap;
+    resources_left = resource_cap;
     ran = [a \in Actors |-> FALSE];
 
 define
@@ -39,26 +40,27 @@ end process;
 process time = "time"
 begin
     Tick:
-        resources_left := ResourceCap;
+        resources_left := resource_cap;
         ran := [a \in Actors |-> FALSE];
         goto Tick;
 end process;
 
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "5de6252" /\ chksum(tla) = "7f0900eb")
-VARIABLES resources_left, ran, pc
+\* BEGIN TRANSLATION (chksum(pcal) = "89aeaf6f" /\ chksum(tla) = "574e6694")
+VARIABLES resource_cap, resources_left, ran, pc
 
 (* define statement *)
 ResourceInvariant == resources_left >= 0
 
 VARIABLE resources_needed
 
-vars == << resources_left, ran, pc, resources_needed >>
+vars == << resource_cap, resources_left, ran, pc, resources_needed >>
 
 ProcSet == (Actors) \union {"time"}
 
 Init == (* Global variables *)
-    /\ resources_left = ResourceCap
+    /\ resource_cap \in 1..ResourceCap
+    /\ resources_left = resource_cap
     /\ ran = [a \in Actors |-> FALSE]
     (* Process actor *)
     /\ resources_needed \in [Actors -> 1..MaxConsumerReq]
@@ -69,7 +71,7 @@ WaitForResources(self) ==
     /\ pc[self] = "WaitForResources"
     /\ ~ran[self]
     /\ pc' = [pc EXCEPT ![self] = "UseResources"]
-    /\ UNCHANGED << resources_left, ran,
+    /\ UNCHANGED << resource_cap, resources_left, ran,
         resources_needed >>
 
 UseResources(self) ==
@@ -86,15 +88,16 @@ UseResources(self) ==
             /\ ran' = [ran EXCEPT ![self] = TRUE]
             /\ pc' = [pc EXCEPT ![self] = "WaitForResources"]
             /\ UNCHANGED resources_left
+    /\ UNCHANGED resource_cap
 
 actor(self) == WaitForResources(self) \/ UseResources(self)
 
 Tick ==
     /\ pc["time"] = "Tick"
-    /\ resources_left' = ResourceCap
+    /\ resources_left' = resource_cap
     /\ ran' = [a \in Actors |-> FALSE]
     /\ pc' = [pc EXCEPT !["time"] = "Tick"]
-    /\ UNCHANGED resources_needed
+    /\ UNCHANGED << resource_cap, resources_needed >>
 
 time == Tick
 
