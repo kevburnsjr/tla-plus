@@ -32,6 +32,7 @@ begin
                 while resources_needed > 0 do
                     resources_left := resources_left - 1;
                     resources_needed := resources_needed - 1;
+                    reserved := reserved - 1;
                 end while;
                 with x \in 1..MaxConsumerReq do
                     resources_needed := x;
@@ -43,12 +44,11 @@ process time = "time"
 begin
     Tick:
         resources_left := resource_cap;
-        reserved := 0;
         goto Tick;
 end process;
 
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "10e346ea" /\ chksum(tla) = "c31a870d")
+\* BEGIN TRANSLATION (chksum(pcal) = "ff1d4061" /\ chksum(tla) = "fcce8b79")
 VARIABLES resource_cap, resources_left, reserved, pc
 
 (* define statement *)
@@ -83,22 +83,22 @@ UseResources(self) ==
         THEN
             /\ resources_left' = resources_left - 1
             /\ resources_needed' = [resources_needed EXCEPT ![self] = resources_needed[self] - 1]
+            /\ reserved' = reserved - 1
             /\ pc' = [pc EXCEPT ![self] = "UseResources"]
         ELSE
             /\ \E x \in 1..MaxConsumerReq:
                 resources_needed' = [resources_needed EXCEPT ![self] = x]
             /\ pc' = [pc EXCEPT ![self] = "WaitForResources"]
-            /\ UNCHANGED resources_left
-    /\ UNCHANGED << resource_cap, reserved >>
+            /\ UNCHANGED << resources_left, reserved >>
+    /\ UNCHANGED resource_cap
 
 actor(self) == WaitForResources(self) \/ UseResources(self)
 
 Tick ==
     /\ pc["time"] = "Tick"
     /\ resources_left' = resource_cap
-    /\ reserved' = 0
     /\ pc' = [pc EXCEPT !["time"] = "Tick"]
-    /\ UNCHANGED << resource_cap, resources_needed >>
+    /\ UNCHANGED << resource_cap, reserved, resources_needed >>
 
 time == Tick
 
