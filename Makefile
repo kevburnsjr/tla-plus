@@ -30,6 +30,11 @@ knapsack:
 	@tlafmt --in-place practical-tla-plus/knapsack.tla
 	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/knapsack.cfg -workers auto -cleanup practical-tla-plus/knapsack.tla
 
+message_queue:
+	@java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans practical-tla-plus/message_queue.tla
+	@tlafmt --in-place practical-tla-plus/message_queue.tla
+	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/message_queue.cfg -workers auto -cleanup practical-tla-plus/message_queue.tla
+
 trans:
 	@echo "java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans -h"
 
