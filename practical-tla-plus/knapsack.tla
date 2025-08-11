@@ -4,13 +4,19 @@ EXTENDS Sequences, Integers, TLC
 PT == INSTANCE PT
 
 CONSTANTS Capacity, Items,
-    SizeRangeMin, SizeRangeMax,
-    ValueRangeMin, ValueRangeMax
+    SizeMin, SizeMax,
+    ValueMin, ValueMax
 
-ItemParams == [
-    size: SizeRangeMin..SizeRangeMax,
-    value: ValueRangeMin..ValueRangeMax
-]
+SizeRange == SizeMin..SizeMax
+ValueRange == ValueMin..ValueMax
+
+ASSUME SizeRange \subseteq 1..Capacity
+ASSUME Capacity \in Nat \ {0}
+ASSUME ValueRange \subseteq Nat
+
+Items_ == Permutations(Items)
+
+ItemParams == [size: SizeRange, value: ValueRange]
 ItemSets == [Items -> ItemParams]
 
 KnapsackSize(sack, itemset) ==
@@ -44,7 +50,7 @@ variables
 begin
     assert BestKnapsacks(itemset) \subseteq ValidKnapsacks(itemset);
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "6d2365f" /\ chksum(tla) = "34d01a35")
+\* BEGIN TRANSLATION (chksum(pcal) = "6d2365f" /\ chksum(tla) = "9d8d68f4")
 VARIABLES itemset, pc
 
 vars == << itemset, pc >>
@@ -56,7 +62,7 @@ Init == (* Global variables *)
 Lbl_1 ==
     /\ pc = "Lbl_1"
     /\ Assert(BestKnapsacks(itemset) \subseteq ValidKnapsacks(itemset),
-        "Failure of assertion at line 45, column 5.")
+        "Failure of assertion at line 51, column 5.")
     /\ pc' = "Done"
     /\ UNCHANGED itemset
 
