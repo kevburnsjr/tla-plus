@@ -35,6 +35,11 @@ message_queue:
 	@tlafmt --in-place practical-tla-plus/message_queue.tla
 	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/message_queue.cfg -workers auto -cleanup practical-tla-plus/message_queue.tla
 
+cache:
+	@java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans practical-tla-plus/cache.tla
+	@tlafmt --in-place practical-tla-plus/cache.tla
+	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/cache.cfg -workers auto -cleanup practical-tla-plus/cache.tla
+
 trans:
 	@echo "java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans -h"
 
