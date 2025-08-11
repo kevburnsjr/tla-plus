@@ -111,4 +111,4 @@ Spec == Init /\ [][Next]_vars
 
 ================================================================================
 
-Practical TLA+ - Chapter 4
+Practical TLA+ - Chapter 5
