@@ -12,14 +12,19 @@ variables flag = [t \in Threads |-> FALSE];
 fair process thread \in Threads
 begin
     P1: flag[self] := TRUE;
-    P2: await \A t \in Threads \ {self}: ~flag[t];
+    \* P2: await \A t \in Threads \ {self}: ~flag[t];
+    P2: 
+        while \E t \in Threads \ {self}: flag[t] do
+            P2_1: flag[self] := FALSE;
+            p2_2: flag[self] := TRUE;
+        end while;
     CS: skip;
     P3: flag[self] := FALSE;
     P4: goto P1;
 end process;
 
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "d8900cdc" /\ chksum(tla) = "f884ff52")
+\* BEGIN TRANSLATION (chksum(pcal) = "666d0ef3" /\ chksum(tla) = "3f04fd45")
 VARIABLES flag, pc
 
 vars == << flag, pc >>
@@ -37,9 +42,22 @@ P1(self) ==
 
 P2(self) ==
     /\ pc[self] = "P2"
-    /\ \A t \in Threads \ {self}: ~flag[t]
-    /\ pc' = [pc EXCEPT ![self] = "CS"]
+    /\ IF \E t \in Threads \ {self}: flag[t]
+        THEN
+            /\ pc' = [pc EXCEPT ![self] = "P2_1"]
+        ELSE
+            /\ pc' = [pc EXCEPT ![self] = "CS"]
     /\ flag' = flag
+
+P2_1(self) ==
+    /\ pc[self] = "P2_1"
+    /\ flag' = [flag EXCEPT ![self] = FALSE]
+    /\ pc' = [pc EXCEPT ![self] = "p2_2"]
+
+p2_2(self) ==
+    /\ pc[self] = "p2_2"
+    /\ flag' = [flag EXCEPT ![self] = TRUE]
+    /\ pc' = [pc EXCEPT ![self] = "P2"]
 
 CS(self) ==
     /\ pc[self] = "CS"
@@ -57,7 +75,8 @@ P4(self) ==
     /\ pc' = [pc EXCEPT ![self] = "P1"]
     /\ flag' = flag
 
-thread(self) == P1(self) \/ P2(self) \/ CS(self) \/ P3(self) \/ P4(self)
+thread(self) == P1(self) \/ P2(self) \/ P2_1(self) \/ p2_2(self)
+\/ CS(self) \/ P3(self) \/ P4(self)
 
 (* Allow infinite stuttering to prevent deadlock on termination. *)
 Terminating ==
@@ -84,6 +103,10 @@ Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 AtMostOneCritical ==
     \A t1, t2 \in Threads:
         t1 /= t2 => ~(pc[t1] = "CS" /\ pc[t2] = "CS")
+
+Liveness ==
+    \A t \in Threads:
+    <>(pc[t] = "CS")
 
 ================================================================================
 
