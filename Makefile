@@ -50,6 +50,11 @@ dekker:
 	@bin/tlafmt --in-place practical-tla-plus/dekker.tla
 	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/dekker.cfg -workers auto -cleanup practical-tla-plus/dekker.tla
 
+add:
+	@java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans practical-tla-plus/add.tla
+	@bin/tlafmt --in-place practical-tla-plus/add.tla
+	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/add.cfg -workers auto -cleanup practical-tla-plus/add.tla
+
 trans:
 	@echo "java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans -h"
 
