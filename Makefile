@@ -65,6 +65,11 @@ leftpad:
 	@bin/tlafmt --in-place practical-tla-plus/leftpad.tla
 	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/leftpad.cfg -workers auto -cleanup practical-tla-plus/leftpad.tla
 
+binary_search:
+	@java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans practical-tla-plus/binary_search.tla
+	@bin/tlafmt --in-place practical-tla-plus/binary_search.tla
+	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/binary_search.cfg -workers auto -cleanup practical-tla-plus/binary_search.tla
+
 trans:
 	@echo "java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans -h"
 
