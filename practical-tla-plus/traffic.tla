@@ -11,7 +11,7 @@ variables
     at_light = TRUE,
     light = "red";
 
-process light = "light"
+fair process light = "light"
 begin
     Cycle:
         while at_light do
@@ -19,15 +19,15 @@ begin
         end while;
 end process;
 
-process car = "car"
+fair process car = "car"
 begin
-    Drive:
+    Drive:+
         when light = "green";
         at_light := FALSE;
 end process;
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "79b53216" /\ chksum(tla) = "7529040b")
-\* Process light at line 14 col 1 changed to light_
+\* BEGIN TRANSLATION (chksum(pcal) = "7ad47d8" /\ chksum(tla) = "6a5e822d")
+\* Process light at line 14 col 6 changed to light_
 VARIABLES at_light, light, pc
 
 vars == << at_light, light, pc >>
@@ -70,7 +70,10 @@ Terminating ==
 Next == light_ \/ car
 \/ Terminating
 
-Spec == Init /\ [][Next]_vars
+Spec ==
+    /\ Init /\ [][Next]_vars
+    /\ WF_vars(light_)
+    /\ WF_vars(car) /\ SF_vars(Drive)
 
 Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
