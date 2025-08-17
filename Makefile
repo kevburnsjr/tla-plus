@@ -60,6 +60,11 @@ max:
 	@bin/tlafmt --in-place practical-tla-plus/max.tla
 	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/max.cfg -workers auto -cleanup practical-tla-plus/max.tla
 
+leftpad:
+	@java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans practical-tla-plus/leftpad.tla
+	@bin/tlafmt --in-place practical-tla-plus/leftpad.tla
+	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/leftpad.cfg -workers auto -cleanup practical-tla-plus/leftpad.tla
+
 trans:
 	@echo "java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans -h"
 
