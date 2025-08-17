@@ -45,6 +45,11 @@ traffic:
 	@bin/tlafmt --in-place practical-tla-plus/traffic.tla
 	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/traffic.cfg -workers auto -cleanup practical-tla-plus/traffic.tla
 
+dekker:
+	@java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans practical-tla-plus/dekker.tla
+	@bin/tlafmt --in-place practical-tla-plus/dekker.tla
+	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/dekker.cfg -workers auto -cleanup practical-tla-plus/dekker.tla
+
 trans:
 	@echo "java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans -h"
 
