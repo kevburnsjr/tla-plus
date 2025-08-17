@@ -55,6 +55,11 @@ add:
 	@bin/tlafmt --in-place practical-tla-plus/add.tla
 	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/add.cfg -workers auto -cleanup practical-tla-plus/add.tla
 
+max:
+	@java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans practical-tla-plus/max.tla
+	@bin/tlafmt --in-place practical-tla-plus/max.tla
+	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/max.cfg -workers auto -cleanup practical-tla-plus/max.tla
+
 trans:
 	@echo "java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans -h"
 
