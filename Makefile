@@ -40,6 +40,11 @@ cache:
 	@bin/tlafmt --in-place practical-tla-plus/cache.tla
 	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/cache.cfg -workers auto -cleanup practical-tla-plus/cache.tla
 
+traffic:
+	@java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans practical-tla-plus/traffic.tla
+	@bin/tlafmt --in-place practical-tla-plus/traffic.tla
+	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/traffic.cfg -workers auto -cleanup practical-tla-plus/traffic.tla
+
 trans:
 	@echo "java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans -h"
 
@@ -53,4 +58,4 @@ install:
 	rm -rf release
 	rm -rf tlafmt_v0.4.1_x86_64-unknown-linux-musl.tar.gz
 	rm -rf apalache-v0.17.5.zip
-	sudo apt install default-jdk
+	sudo apt install -y default-jdk
