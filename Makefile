@@ -75,6 +75,10 @@ counter_incrementer:
 	@bin/tlafmt --in-place practical-tla-plus/counter_incrementer.tla
 	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/counter_incrementer.cfg -workers auto -cleanup practical-tla-plus/counter_incrementer.tla
 
+linked_list_main:
+	@bin/tlafmt --in-place practical-tla-plus/linked_list_main.tla
+	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/linked_list_main.cfg -workers auto -cleanup practical-tla-plus/linked_list_main.tla
+
 trans:
 	@echo "java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans -h"
 
