@@ -79,6 +79,11 @@ linked_list_main:
 	@bin/tlafmt --in-place practical-tla-plus/linked_list_main.tla
 	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/linked_list_main.cfg -workers auto -cleanup practical-tla-plus/linked_list_main.tla
 
+tortoise_and_hare:
+	@java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans practical-tla-plus/tortoise_and_hare.tla
+	@bin/tlafmt --in-place practical-tla-plus/tortoise_and_hare.tla
+	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/tortoise_and_hare.cfg -workers auto -cleanup practical-tla-plus/tortoise_and_hare.tla
+
 trans:
 	@echo "java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans -h"
 
