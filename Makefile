@@ -70,6 +70,11 @@ binary_search:
 	@bin/tlafmt --in-place practical-tla-plus/binary_search.tla
 	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/binary_search.cfg -workers auto -cleanup practical-tla-plus/binary_search.tla
 
+counter_incrementer:
+	@java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans practical-tla-plus/counter_incrementer.tla
+	@bin/tlafmt --in-place practical-tla-plus/counter_incrementer.tla
+	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/counter_incrementer.cfg -workers auto -cleanup practical-tla-plus/counter_incrementer.tla
+
 trans:
 	@echo "java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans -h"
 
