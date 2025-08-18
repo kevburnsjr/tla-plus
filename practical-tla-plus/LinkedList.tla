@@ -10,6 +10,8 @@ LOCAL INSTANCE TLC
 
 LOCAL PointerMaps(Nodes) == [ Nodes -> Nodes \union {NULL} ]
 
+Range(f) == {f[x]: x \in DOMAIN f}
+
 LOCAL isLinkedList(PointerMap) ==
     LET
         nodes == DOMAIN PointerMap
@@ -27,7 +29,7 @@ LinkedLists(Nodes) ==
         all_pointer_maps == UNION pointer_maps_sets
     IN {pm \in all_pointer_maps : isLinkedList(pm)}
 
-Range(f) == {f[x]: x \in DOMAIN f}
+Cyclic(LL) == NULL \notin Range(LL)
 
 Ring(LL) == (DOMAIN LL = Range(LL))
 
