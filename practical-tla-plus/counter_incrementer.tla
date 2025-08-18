@@ -17,11 +17,10 @@ variable local = 0
 begin
     Get:
         local := counter;
-    Increment:
         counter := local + 1;
 end process;
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "81703eed" /\ chksum(tla) = "78ebc73d")
+\* BEGIN TRANSLATION (chksum(pcal) = "82b7f231" /\ chksum(tla) = "bb8264af")
 VARIABLES counter, goal, pc
 
 (* define statement *)
@@ -43,16 +42,11 @@ Init == (* Global variables *)
 Get(self) ==
     /\ pc[self] = "Get"
     /\ local' = [local EXCEPT ![self] = counter]
-    /\ pc' = [pc EXCEPT ![self] = "Increment"]
-    /\ UNCHANGED << counter, goal >>
-
-Increment(self) ==
-    /\ pc[self] = "Increment"
-    /\ counter' = local[self] + 1
+    /\ counter' = local' [self] + 1
     /\ pc' = [pc EXCEPT ![self] = "Done"]
-    /\ UNCHANGED << goal, local >>
+    /\ goal' = goal
 
-incrementer(self) == Get(self) \/ Increment(self)
+incrementer(self) == Get(self)
 
 (* Allow infinite stuttering to prevent deadlock on termination. *)
 Terminating ==
