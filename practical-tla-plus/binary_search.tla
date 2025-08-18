@@ -19,22 +19,38 @@ Pow2(n) ==
 
 (*--algorithm binary_search
 variables
-    i = 1,
+    low = 1,
     seq \in OrderedSeqOf(1..MaxInt, MaxInt),
+    high = Len(seq),
     target \in 1..MaxInt,
     found_index = 0,
     counter = 0;
 
 begin
     Search:
-        while i <= Len(seq) do
-            counter := counter + 1;
-            if seq[i] = target then
-                found_index := i;
-                goto Result;
-            else
-                i := i + 1;
-            end if;
+        \* while i <= Len(seq) do
+        \*     counter := counter + 1;
+        \*     if seq[i] = target then
+        \*         found_index := i;
+        \*         goto Result;
+        \*     else
+        \*         i := i + 1;
+        \*     end if;
+        \* end while;
+        while low <= high do
+            counter := counter +1;
+            with
+                m = (high + low) \div 2
+            do
+                if seq[m] = target then
+                    found_index := m;
+                    goto Result;
+                elsif seq[m] < target then
+                    low := m + 1;
+                else
+                    high := m - 1;
+                end if;
+            end with;
         end while;
     Result:
         if Len(seq) > 0 then
@@ -46,14 +62,15 @@ begin
             assert found_index = 0;
         end if;
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "a9199070" /\ chksum(tla) = "8529051f")
-VARIABLES i, seq, target, found_index, counter, pc
+\* BEGIN TRANSLATION (chksum(pcal) = "94b676fb" /\ chksum(tla) = "62cf2c10")
+VARIABLES low, seq, high, target, found_index, counter, pc
 
-vars == << i, seq, target, found_index, counter, pc >>
+vars == << low, seq, high, target, found_index, counter, pc >>
 
 Init == (* Global variables *)
-    /\ i = 1
+    /\ low = 1
     /\ seq \in OrderedSeqOf(1..MaxInt, MaxInt)
+    /\ high = Len(seq)
     /\ target \in 1..MaxInt
     /\ found_index = 0
     /\ counter = 0
@@ -61,21 +78,28 @@ Init == (* Global variables *)
 
 Search ==
     /\ pc = "Search"
-    /\ IF i <= Len(seq)
+    /\ IF low <= high
         THEN
             /\ counter' = counter + 1
-            /\ IF seq[i] = target
+            /\ LET m == (high + low) \div 2 IN
+                IF seq[m] = target
                 THEN
-                    /\ found_index' = i
+                    /\ found_index' = m
                     /\ pc' = "Result"
-                    /\ i' = i
+                    /\ UNCHANGED << low, high >>
                 ELSE
-                    /\ i' = i + 1
+                    /\ IF seq[m] < target
+                        THEN
+                            /\ low' = m + 1
+                            /\ high' = high
+                        ELSE
+                            /\ high' = m - 1
+                            /\ low' = low
                     /\ pc' = "Search"
                     /\ UNCHANGED found_index
         ELSE
             /\ pc' = "Result"
-            /\ UNCHANGED << i, found_index, counter >>
+            /\ UNCHANGED << low, high, found_index, counter >>
     /\ UNCHANGED << seq, target >>
 
 Result ==
@@ -83,18 +107,18 @@ Result ==
     /\ IF Len(seq) > 0
         THEN
             /\ Assert(Pow2(counter - 1) <= Len(seq),
-                "Failure of assertion at line 41, column 13.")
+                "Failure of assertion at line 57, column 13.")
         ELSE
             /\ TRUE
     /\ IF target \in Range(seq)
         THEN
             /\ Assert(seq[found_index] = target,
-                "Failure of assertion at line 44, column 13.")
+                "Failure of assertion at line 60, column 13.")
         ELSE
             /\ Assert(found_index = 0,
-                "Failure of assertion at line 46, column 13.")
+                "Failure of assertion at line 62, column 13.")
     /\ pc' = "Done"
-    /\ UNCHANGED << i, seq, target, found_index, counter >>
+    /\ UNCHANGED << low, seq, high, target, found_index, counter >>
 
 (* Allow infinite stuttering to prevent deadlock on termination. *)
 Terminating == pc = "Done" /\ UNCHANGED vars
