@@ -14,7 +14,7 @@ define
 end define;
 
 macro request(data) begin
-    query[self] := [type |-> "request", data |-> data];
+    query[self] := [type |-> "request"] @@ data;
 end macro;
 
 macro wait_for_response() begin
@@ -25,8 +25,14 @@ process database = "Database"
 begin
     DB:
         with client \in RequestingClients, q = query[client] do
-            db_value := q.data;
-            query[client] := [type |-> "response"];
+            if q.request = "write" then
+                db_value := q.data;
+            elsif q.request = "read" then
+                skip;
+            else
+                assert FALSE;
+            end if;
+            query[client] := [type |-> "response", result |-> db_value];
         end with;
     goto DB;
 end process;
@@ -37,11 +43,14 @@ begin
     Request:
         while TRUE do
             either
-                result := db_value;
-                assert result = db_value;
+                request([request |-> "read"]);
+                Confirm:
+                    wait_for_response();
+                    result := query[self].result;
+                    assert result = db_value;
             or
                 with d \in Data do
-                    request(d);
+                    request([request |-> "write", data |-> d]);
                 end with;
                 Wait:
                     wait_for_response();
@@ -49,7 +58,7 @@ begin
         end while
 end process;
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "1f539ef3" /\ chksum(tla) = "501e3fa1")
+\* BEGIN TRANSLATION (chksum(pcal) = "64b9070a" /\ chksum(tla) = "1974e8dd")
 VARIABLES query, db_value, pc
 
 (* define statement *)
@@ -74,8 +83,18 @@ DB ==
     /\ pc["Database"] = "DB"
     /\ \E client \in RequestingClients:
         LET q == query[client] IN
-            /\ db_value' = q.data
-            /\ query' = [query EXCEPT ![client] = [type |-> "response"]]
+            /\ IF q.request = "write"
+                THEN
+                    /\ db_value' = q.data
+                ELSE
+                    /\ IF q.request = "read"
+                        THEN
+                            /\ TRUE
+                        ELSE
+                            /\ Assert(FALSE,
+                                "Failure of assertion at line 33, column 17.")
+                    /\ UNCHANGED db_value
+            /\ query' = [query EXCEPT ![client] = [type |-> "response", result |-> db_value']]
     /\ pc' = [pc EXCEPT !["Database"] = "DB"]
     /\ UNCHANGED result
 
@@ -85,17 +104,22 @@ Request(self) ==
     /\ pc[self] = "Request"
     /\
         \/
-            /\ result' = [result EXCEPT ![self] = db_value]
-            /\ Assert(result' [self] = db_value,
-                "Failure of assertion at line 41, column 17.")
-            /\ pc' = [pc EXCEPT ![self] = "Request"]
-            /\ query' = query
+            /\ query' = [query EXCEPT ![self] = [type |-> "request"] @@ ([request |-> "read"])]
+            /\ pc' = [pc EXCEPT ![self] = "Confirm"]
         \/
             /\ \E d \in Data:
-                query' = [query EXCEPT ![self] = [type |-> "request", data |-> d]]
+                query' = [query EXCEPT ![self] = [type |-> "request"] @@ ([request |-> "write", data |-> d])]
             /\ pc' = [pc EXCEPT ![self] = "Wait"]
-            /\ UNCHANGED result
-    /\ UNCHANGED db_value
+    /\ UNCHANGED << db_value, result >>
+
+Confirm(self) ==
+    /\ pc[self] = "Confirm"
+    /\ query[self].type = "response"
+    /\ result' = [result EXCEPT ![self] = query[self].result]
+    /\ Assert(result' [self] = db_value,
+        "Failure of assertion at line 50, column 21.")
+    /\ pc' = [pc EXCEPT ![self] = "Request"]
+    /\ UNCHANGED << query, db_value >>
 
 Wait(self) ==
     /\ pc[self] = "Wait"
@@ -103,14 +127,14 @@ Wait(self) ==
     /\ pc' = [pc EXCEPT ![self] = "Request"]
     /\ UNCHANGED << query, db_value, result >>
 
-clients(self) == Request(self) \/ Wait(self)
+clients(self) == Request(self) \/ Confirm(self) \/ Wait(self)
 
 Next == database
 \/ (\E self \in Clients: clients(self))
 
 Spec == Init /\ [][Next]_vars
 
-\* END TRANSLATION 
+\* END TRANSLATION
 
 ================================================================================
 
