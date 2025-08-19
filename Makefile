@@ -94,6 +94,11 @@ sm_database:
 	@bin/tlafmt --in-place practical-tla-plus/sm_database.tla
 	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/sm_database.cfg -workers auto -cleanup practical-tla-plus/sm_database.tla
 
+library:
+	@java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans practical-tla-plus/library.tla
+	@bin/tlafmt --in-place practical-tla-plus/library.tla
+	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/library.cfg -workers auto -cleanup practical-tla-plus/library.tla
+
 trans:
 	@echo "java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans -h"
 
