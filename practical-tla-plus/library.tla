@@ -17,7 +17,6 @@ variables
 define
     AvailableBooks == {b \in Books: library[b] > 0}
     BorrowableBooks(p) == {b \in AvailableBooks: reservations[b] = {} \/ (p \in reservations[b] /\ p = Head(order[b])) }
-    ReservableBooks(p) == {b \in Books: p \notin reservations[b] }
 end define;
 
 fair process person \in People
@@ -27,7 +26,7 @@ variables
 begin
     Person:
         either
-            with b \in BorrowableBooks(self) \ books do
+            with b \in (BorrowableBooks(self) \intersect wants) \ books do
                 if self \in reservations[b] then
                     order[b] := Tail(order[b]);
                     reservations[b] := reservations[b] \ {self}
@@ -42,22 +41,26 @@ begin
                 books := books \ {b};
             end with;
         or
-            with b \in ReservableBooks(self) do
+            with b \in {b \in wants: self \notin reservations[b]} do
                 reservations[b] := reservations[b] \union {self};
                 order[b] := Append(order[b], self);
             end with
+        or
+            await wants = {};
+            with b \in SUBSET books do
+                wants := b;
+            end with;
         end either;
     goto Person;
 end process;
 
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "47a661a0" /\ chksum(tla) = "bbed2b84")
+\* BEGIN TRANSLATION (chksum(pcal) = "482dc1ec" /\ chksum(tla) = "db8cde1b")
 VARIABLES library, reservations, order, pc
 
 (* define statement *)
 AvailableBooks == {b \in Books: library[b] > 0}
 BorrowableBooks(p) == {b \in AvailableBooks: reservations[b] = {} \/ (p \in reservations[b] /\ p = Head(order[b]))}
-ReservableBooks(p) == {b \in Books: p \notin reservations[b]}
 
 VARIABLES books, wants
 
@@ -78,7 +81,7 @@ Person(self) ==
     /\ pc[self] = "Person"
     /\
         \/
-            /\ \E b \in BorrowableBooks(self) \ books[self]:
+            /\ \E b \in (BorrowableBooks(self) \intersect wants[self]) \ books[self]:
                 /\ IF self \in reservations[b]
                     THEN
                         /\ order' = [order EXCEPT ![b] = Tail(order[b])]
@@ -95,10 +98,15 @@ Person(self) ==
                     /\ books' = [books EXCEPT ![self] = books[self] \ {b}]
                 /\ UNCHANGED << reservations, order, wants >>
         \/
-                /\ \E b \in ReservableBooks(self):
+                /\ \E b \in {b \in wants[self]: self \notin reservations[b]}:
                     /\ reservations' = [reservations EXCEPT ![b] = reservations[b] \union {self}]
                     /\ order' = [order EXCEPT ![b] = Append(order[b], self)]
                 /\ UNCHANGED << library, books, wants >>
+        \/
+                /\ wants[self] = {}
+                /\ \E b \in SUBSET books[self]:
+                    wants' = [wants EXCEPT ![self] = b]
+                /\ UNCHANGED << library, reservations, order, books >>
     /\ pc' = [pc EXCEPT ![self] = "Person"]
 
 person(self) == Person(self)
@@ -132,7 +140,9 @@ TypeInvariant ==
     /\ NoDuplicateReservations
 
 Liveness ==
-    /\ <>(\A p \in People: wants[p] = {})
+    \A p \in People:
+        \A b \in Books:
+            b \in wants[p] ~> b \notin wants[p]
 
 ================================================================================
 
