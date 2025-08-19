@@ -1,6 +1,6 @@
 -------------------------------- MODULE library --------------------------------
 
-EXTENDS Integers, TLC, Sequences
+EXTENDS Integers, TLC, Sequences, FiniteSets
 CONSTANTS Books, People, NumCopiesMin, NumCopiesMax
 
 NumCopies == NumCopiesMin..NumCopiesMax
@@ -16,7 +16,7 @@ variables
 
 define
     AvailableBooks == {b \in Books: library[b] > 0}
-    BorrowableBooks(p) == {b \in AvailableBooks: reservations[b] = {} \/ (p \in reservations[b] /\ p = Head(order[b])) }
+    BorrowableBooks(p) == {b \in AvailableBooks: order[b] = <<>> \/ p = Head(order[b]) }
 end define;
 
 fair process person \in People
@@ -51,22 +51,31 @@ begin
                 wants := b;
             end with;
         end either;
-    goto Person;
+        goto Person;
+end process;
+
+fair process book_reservations \in Books
+begin
+    Expire:
+        await order[self] # <<>>;
+        reservations[self] := reservations[self] \ {Head(order[self])};
+        order[self] := Tail(order[self]);
+        goto Expire;
 end process;
 
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "482dc1ec" /\ chksum(tla) = "db8cde1b")
+\* BEGIN TRANSLATION (chksum(pcal) = "cec4af41" /\ chksum(tla) = "e2296c29")
 VARIABLES library, reservations, order, pc
 
 (* define statement *)
 AvailableBooks == {b \in Books: library[b] > 0}
-BorrowableBooks(p) == {b \in AvailableBooks: reservations[b] = {} \/ (p \in reservations[b] /\ p = Head(order[b]))}
+BorrowableBooks(p) == {b \in AvailableBooks: order[b] = <<>> \/ p = Head(order[b])}
 
 VARIABLES books, wants
 
 vars == << library, reservations, order, pc, books, wants >>
 
-ProcSet == (People)
+ProcSet == (People) \union (Books)
 
 Init == (* Global variables *)
     /\ library \in [Books -> NumCopies]
@@ -75,7 +84,8 @@ Init == (* Global variables *)
     (* Process person *)
     /\ books = [self \in People |-> {}]
     /\ wants \in [People -> SUBSET Books]
-    /\ pc = [self \in ProcSet |-> "Person"]
+    /\ pc = [self \in ProcSet |-> CASE self \in People -> "Person"
+        [] self \in Books -> "Expire"]
 
 Person(self) ==
     /\ pc[self] = "Person"
@@ -111,17 +121,29 @@ Person(self) ==
 
 person(self) == Person(self)
 
+Expire(self) ==
+    /\ pc[self] = "Expire"
+    /\ order[self] /= <<>>
+    /\ reservations' = [reservations EXCEPT ![self] = reservations[self] \ {Head(order[self])}]
+    /\ order' = [order EXCEPT ![self] = Tail(order[self])]
+    /\ pc' = [pc EXCEPT ![self] = "Expire"]
+    /\ UNCHANGED << library, books, wants >>
+
+book_reservations(self) == Expire(self)
+
 (* Allow infinite stuttering to prevent deadlock on termination. *)
 Terminating ==
     /\ \A self \in ProcSet: pc[self] = "Done"
     /\ UNCHANGED vars
 
 Next == (\E self \in People: person(self))
+\/ (\E self \in Books: book_reservations(self))
 \/ Terminating
 
 Spec ==
     /\ Init /\ [][Next]_vars
     /\ \A self \in People: WF_vars(person(self))
+    /\ \A self \in Books: WF_vars(book_reservations(self))
 
 Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
@@ -142,7 +164,14 @@ TypeInvariant ==
 Liveness ==
     \A p \in People:
         \A b \in Books:
-            b \in wants[p] ~> b \notin wants[p]
+            b \in wants[p] ~>
+                \/ b \notin wants[p]
+                \/
+                    /\ order[b] /= <<>>
+                    /\ p = Head(order[b])
+
+WantOneMax ==
+    \A p \in People: Cardinality(wants[p]) <= 1
 
 ================================================================================
 
