@@ -10,10 +10,14 @@ ASSUME NumCopies \subseteq Nat
 
 (*--algorithm library
 variables
-    library \in [Books -> NumCopies];
+    library \in [Books -> NumCopies],
+    reservations = [b \in Books |-> {}],
+    order = [b \in Books |-> <<>>];
 
 define
     AvailableBooks == {b \in Books: library[b] > 0}
+    BorrowableBooks(p) == {b \in AvailableBooks: reservations[b] = {} \/ (p \in reservations[b] /\ p = Head(order[b])) }
+    ReservableBooks(p) == {b \in Books: p \notin reservations[b] }
 end define;
 
 fair process person \in People
@@ -23,7 +27,11 @@ variables
 begin
     Person:
         either
-            with b \in AvailableBooks \ books do
+            with b \in BorrowableBooks(self) \ books do
+                if self \in reservations[b] then
+                    order[b] := Tail(order[b]);
+                    reservations[b] := reservations[b] \ {self}
+                end if;
                 library[b] := library[b] - 1;
                 books := books \union {b};
                 wants := wants \ {b};
@@ -33,25 +41,34 @@ begin
                 library[b] := library[b] + 1;
                 books := books \ {b};
             end with;
+        or
+            with b \in ReservableBooks(self) do
+                reservations[b] := reservations[b] \union {self};
+                order[b] := Append(order[b], self);
+            end with
         end either;
     goto Person;
 end process;
 
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "2e66ec1c" /\ chksum(tla) = "1237fd7b")
-VARIABLES library, pc
+\* BEGIN TRANSLATION (chksum(pcal) = "47a661a0" /\ chksum(tla) = "bbed2b84")
+VARIABLES library, reservations, order, pc
 
 (* define statement *)
 AvailableBooks == {b \in Books: library[b] > 0}
+BorrowableBooks(p) == {b \in AvailableBooks: reservations[b] = {} \/ (p \in reservations[b] /\ p = Head(order[b]))}
+ReservableBooks(p) == {b \in Books: p \notin reservations[b]}
 
 VARIABLES books, wants
 
-vars == << library, pc, books, wants >>
+vars == << library, reservations, order, pc, books, wants >>
 
 ProcSet == (People)
 
 Init == (* Global variables *)
     /\ library \in [Books -> NumCopies]
+    /\ reservations = [b \in Books |-> {}]
+    /\ order = [b \in Books |-> <<>>]
     (* Process person *)
     /\ books = [self \in People |-> {}]
     /\ wants \in [People -> SUBSET Books]
@@ -61,7 +78,14 @@ Person(self) ==
     /\ pc[self] = "Person"
     /\
         \/
-            /\ \E b \in AvailableBooks \ books[self]:
+            /\ \E b \in BorrowableBooks(self) \ books[self]:
+                /\ IF self \in reservations[b]
+                    THEN
+                        /\ order' = [order EXCEPT ![b] = Tail(order[b])]
+                        /\ reservations' = [reservations EXCEPT ![b] = reservations[b] \ {self}]
+                    ELSE
+                        /\ TRUE
+                        /\ UNCHANGED << reservations, order >>
                 /\ library' = [library EXCEPT ![b] = library[b] - 1]
                 /\ books' = [books EXCEPT ![self] = books[self] \union {b}]
                 /\ wants' = [wants EXCEPT ![self] = wants[self] \ {b}]
@@ -69,7 +93,12 @@ Person(self) ==
                 /\ \E b \in books[self]:
                     /\ library' = [library EXCEPT ![b] = library[b] + 1]
                     /\ books' = [books EXCEPT ![self] = books[self] \ {b}]
-                /\ wants' = wants
+                /\ UNCHANGED << reservations, order, wants >>
+        \/
+                /\ \E b \in ReservableBooks(self):
+                    /\ reservations' = [reservations EXCEPT ![b] = reservations[b] \union {self}]
+                    /\ order' = [order EXCEPT ![b] = Append(order[b], self)]
+                /\ UNCHANGED << library, books, wants >>
     /\ pc' = [pc EXCEPT ![self] = "Person"]
 
 person(self) == Person(self)
@@ -90,10 +119,17 @@ Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
 \* END TRANSLATION
 
+NoDuplicateReservations ==
+    \A b \in Books:
+        \A i, j \in 1..Len(order[b]):
+            i /= j => order[b][i] /= order[b][j]
+
 TypeInvariant ==
     /\ library \in [Books -> NumCopies \union {0}]
     /\ books \in [People -> SUBSET Books]
     /\ wants \in [People -> SUBSET Books]
+    /\ order \in [Books -> Seq(People)]
+    /\ NoDuplicateReservations
 
 Liveness ==
     /\ <>(\A p \in People: wants[p] = {})
