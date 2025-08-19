@@ -89,6 +89,11 @@ sm_door:
 	@bin/tlafmt --in-place practical-tla-plus/sm_door.tla
 	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/sm_door.cfg -workers auto -cleanup practical-tla-plus/sm_door.tla
 
+sm_database:
+	@java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans practical-tla-plus/sm_database.tla
+	@bin/tlafmt --in-place practical-tla-plus/sm_database.tla
+	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/sm_database.cfg -workers auto -cleanup practical-tla-plus/sm_database.tla
+
 trans:
 	@echo "java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans -h"
 
