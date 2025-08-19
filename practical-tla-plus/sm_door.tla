@@ -7,68 +7,94 @@ variables
     locked = FALSE,
     key \in BOOLEAN;
 
+process open_door = "Open Door"
 begin
-    Event:
+    OpenDoor:
+        await open;
         either
-            await locked /\ (open \/ key);
-            locked := FALSE;
+            locked := ~locked;
         or
-            await ~locked /\ (open \/ key);
-            locked := TRUE;
-        or
-            await ~locked /\ ~open;
-            open := TRUE;
-        or
-            await open /\ ~locked;
+            await ~locked;
             open := FALSE;
         end either;
-    goto Event;
+        goto OpenDoor;
+end process;
+
+process closed_door = "Closed Door"
+begin
+    ClosedDoor:
+        await ~open;
+        either
+            await key;
+            locked := ~locked;
+        or
+            await ~locked;
+            open := TRUE;
+        end either;
+        goto ClosedDoor;
+end process;
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "b132eb85" /\ chksum(tla) = "ddd12b84")
+\* BEGIN TRANSLATION (chksum(pcal) = "37a706e" /\ chksum(tla) = "e1c1d0fb")
 VARIABLES open, locked, key, pc
 
 vars == << open, locked, key, pc >>
+
+ProcSet == {"Open Door"} \union {"Closed Door"}
 
 Init == (* Global variables *)
     /\ open = FALSE
     /\ locked = FALSE
     /\ key \in BOOLEAN
-    /\ pc = "Event"
+    /\ pc = [self \in ProcSet |-> CASE self = "Open Door" -> "OpenDoor"
+        [] self = "Closed Door" -> "ClosedDoor"]
 
-Event ==
-    /\ pc = "Event"
+OpenDoor ==
+    /\ pc["Open Door"] = "OpenDoor"
+    /\ open
     /\
         \/
-            /\ locked /\ (open \/ key)
-            /\ locked' = FALSE
+            /\ locked' = ~locked
             /\ open' = open
         \/
-            /\ ~locked /\ (open \/ key)
-            /\ locked' = TRUE
-            /\ open' = open
-        \/
-            /\ ~locked /\ ~open
-            /\ open' = TRUE
-            /\ UNCHANGED locked
-        \/
-            /\ open /\ ~locked
+            /\ ~locked
             /\ open' = FALSE
             /\ UNCHANGED locked
-    /\ pc' = "Event"
+    /\ pc' = [pc EXCEPT !["Open Door"] = "OpenDoor"]
     /\ key' = key
 
-(* Allow infinite stuttering to prevent deadlock on termination. *)
-Terminating == pc = "Done" /\ UNCHANGED vars
+open_door == OpenDoor
 
-Next == Event
+ClosedDoor ==
+    /\ pc["Closed Door"] = "ClosedDoor"
+    /\ ~open
+    /\
+        \/
+            /\ key
+            /\ locked' = ~locked
+            /\ open' = open
+        \/
+            /\ ~locked
+            /\ open' = TRUE
+            /\ UNCHANGED locked
+    /\ pc' = [pc EXCEPT !["Closed Door"] = "ClosedDoor"]
+    /\ key' = key
+
+closed_door == ClosedDoor
+
+(* Allow infinite stuttering to prevent deadlock on termination. *)
+Terminating ==
+    /\ \A self \in ProcSet: pc[self] = "Done"
+    /\ UNCHANGED vars
+
+Next == open_door \/ closed_door
 \/ Terminating
 
 Spec == Init /\ [][Next]_vars
 
-Termination == <>(pc = "Done")
+Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
 \* END TRANSLATION 
 
 ================================================================================
 
-Practical TLA+ - Chapter 4
+Practical TLA+ - Chapter 9
