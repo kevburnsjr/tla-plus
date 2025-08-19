@@ -17,18 +17,20 @@ define
 end define;
 
 fair process person \in People
-variables 
-    books = {};
+variables
+    books = {},
+    wants \in SUBSET Books;
 begin
     Person:
         either
             with b \in AvailableBooks \ books do
-                library[b] := library[b] -1;
+                library[b] := library[b] - 1;
                 books := books \union {b};
+                wants := wants \ {b};
             end with;
         or
             with b \in books do
-                library[b] := library[b] -1;
+                library[b] := library[b] + 1;
                 books := books \ {b};
             end with;
         end either;
@@ -36,15 +38,15 @@ begin
 end process;
 
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "e0f085df" /\ chksum(tla) = "85382393")
+\* BEGIN TRANSLATION (chksum(pcal) = "2e66ec1c" /\ chksum(tla) = "1237fd7b")
 VARIABLES library, pc
 
 (* define statement *)
 AvailableBooks == {b \in Books: library[b] > 0}
 
-VARIABLE books
+VARIABLES books, wants
 
-vars == << library, pc, books >>
+vars == << library, pc, books, wants >>
 
 ProcSet == (People)
 
@@ -52,6 +54,7 @@ Init == (* Global variables *)
     /\ library \in [Books -> NumCopies]
     (* Process person *)
     /\ books = [self \in People |-> {}]
+    /\ wants \in [People -> SUBSET Books]
     /\ pc = [self \in ProcSet |-> "Person"]
 
 Person(self) ==
@@ -61,10 +64,12 @@ Person(self) ==
             /\ \E b \in AvailableBooks \ books[self]:
                 /\ library' = [library EXCEPT ![b] = library[b] - 1]
                 /\ books' = [books EXCEPT ![self] = books[self] \union {b}]
+                /\ wants' = [wants EXCEPT ![self] = wants[self] \ {b}]
         \/
                 /\ \E b \in books[self]:
-                    /\ library' = [library EXCEPT ![b] = library[b] - 1]
+                    /\ library' = [library EXCEPT ![b] = library[b] + 1]
                     /\ books' = [books EXCEPT ![self] = books[self] \ {b}]
+                /\ wants' = wants
     /\ pc' = [pc EXCEPT ![self] = "Person"]
 
 person(self) == Person(self)
@@ -83,7 +88,15 @@ Spec ==
 
 Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
-\* END TRANSLATION 
+\* END TRANSLATION
+
+TypeInvariant ==
+    /\ library \in [Books -> NumCopies \union {0}]
+    /\ books \in [People -> SUBSET Books]
+    /\ wants \in [People -> SUBSET Books]
+
+Liveness ==
+    /\ <>(\A p \in People: wants[p] = {})
 
 ================================================================================
 
