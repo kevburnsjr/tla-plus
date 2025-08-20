@@ -99,6 +99,11 @@ library:
 	@bin/tlafmt --in-place practical-tla-plus/library.tla
 	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/library.cfg -workers auto -cleanup practical-tla-plus/library.tla
 
+map_reduce:
+	@java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans practical-tla-plus/map_reduce.tla
+	@bin/tlafmt --in-place practical-tla-plus/map_reduce.tla
+	@java -XX:+UseParallelGC -cp tla2tools.jar tlc2.TLC -config practical-tla-plus/map_reduce.cfg -workers auto -cleanup practical-tla-plus/map_reduce.tla
+
 trans:
 	@echo "java -XX:+UseParallelGC -cp tla2tools.jar pcal.trans -h"
 
