@@ -1,0 +1,5 @@
+deadlock_detection: false
+
+action_options:
+  "Server#.GossipTimer":
+    max_concurrent_actions: 1

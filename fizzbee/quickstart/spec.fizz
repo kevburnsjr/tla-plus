@@ -1,0 +1,23 @@
+NUM_SERVERS=3
+
+role Server:
+    action Init:
+        self.version = 1
+        self.cache = [0] * NUM_SERVERS
+    
+    action GossipTimer:
+        i = any range(NUM_SERVERS) if i != self.ID
+        server = servers[i]
+        self.cache[self.ID] = self.version
+        received_cache = server.gossip(self.cache)
+        self.cache = [max(self.cache[i], received_cache[i]) for i in range(NUM_SERVERS)]
+
+    func gossip(received_cache):
+        self.cache = [max(self.cache[i], received_cache[i]) for i in range(NUM_SERVERS)]
+        self.cache[self.ID] = self.version
+        return self.cache
+
+action Init:
+    servers = []
+    for i in range(NUM_SERVERS):
+        servers.append(Server(ID=i))
