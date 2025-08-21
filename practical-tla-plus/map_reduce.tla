@@ -275,6 +275,8 @@ Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
 Liveness == <>[](SumSeq(final) = SumSeq(input))
 
+ReducerTerminates == <>(pc[Reducer] = "Finish")
+
 ================================================================================
 
 Practical TLA+ - Chapter 11
