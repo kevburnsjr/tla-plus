@@ -1,10 +1,16 @@
 ------------------------------ MODULE map_reduce -------------------------------
 
 EXTENDS Integers, TLC, Sequences, FiniteSets
-CONSTANTS Workers, Reducer, NULL
 PT == INSTANCE PT
 
-PossibleInputs == PT!TupleOf(0..2, 4)
+CONSTANTS Workers, Reducer, NULL
+CONSTANTS ItemMin, ItemMax, ItemCount
+ASSUME ItemMin \in Nat
+ASSUME ItemMax \in Nat
+ASSUME ItemCount \in Nat
+
+ItemRange == ItemMin..ItemMax
+PossibleInputs == PT!TupleOf(ItemRange, ItemCount)
 SumSeq(seq) == PT!ReduceSeq(LAMBDA x, y: x + y, seq, 0)
 FairWorkers == CHOOSE set_w \in SUBSET Workers: Cardinality(set_w) = 1
 UnfairWorkers == Workers \ FairWorkers
@@ -12,16 +18,32 @@ UnfairWorkers == Workers \ FairWorkers
 (*--algorithm map_reduce
 variables
     input \in PossibleInputs,
+    result = [w \in Workers |-> [total |-> NULL, count |-> NULL]],
     queue = [w \in Workers |-> <<>>],
-    result = [w \in Workers |-> [total |-> NULL, count |-> NULL]];
+    status = [w \in Workers |-> "active"];
+
+define
+    ActiveWorkers == {w \in Workers: status[w] = "active"}
+    HealthyWorkers == {w \in Workers: status[w] /= "broken"}
+    TypeInvariant ==
+        /\ status \in [Workers -> {"active", "inactive", "broken"}]
+        /\ \A w \in Workers:
+            /\ Len(queue[w]) <= ItemCount
+            /\ \A item \in 1..Len(queue[w]):
+                queue[w][item] \in ItemRange
+            /\  \/ result[w].total = NULL
+                \/ result[w].total <= SumSeq(input)
+            /\  \/ result[w].count = NULL
+                \/ result[w].count <= ItemCount
+end define;
 
 macro reduce() begin
     with
-        w \in {w \in Workers:
-            result[w].count = Len(assignments[w]) /\ ~consumed[w]}
+        w \in {w \in ActiveWorkers:
+            result[w].count = Len(assignments[w])}
     do
         final[w] := result[w].total;
-        consumed[w] := TRUE;
+        status[w] := "inactive";
     end with;
 end macro;
 
@@ -44,7 +66,6 @@ end procedure;
 fair process reducer = Reducer
 variables
     final = [w \in Workers |-> 0],
-    consumed = [w \in Workers |-> FALSE],
     assignments = [w \in Workers |-> <<>>];
 begin
     Schedule:
@@ -55,19 +76,18 @@ begin
             assignments := queue;
         end with;
     ReduceResult:
-        while \E w \in Workers: ~consumed[w] do
+        while ActiveWorkers /= {} do
             either
                 reduce()
             or
                 with
-                    from_worker \in {w \in UnfairWorkers:
-                        ~consumed[w] /\ result[w].count /= Len(assignments[w])},
-                    to_worker \in FairWorkers
+                    from_worker \in ActiveWorkers \ FairWorkers,
+                    to_worker \in HealthyWorkers \ {from_worker}
                 do
                     assignments[to_worker] := assignments[to_worker] \o assignments[from_worker];
                     queue[to_worker] := queue[to_worker] \o assignments[from_worker];
-                    consumed[from_worker] := TRUE ||
-                    consumed[to_worker] := FALSE;
+                    status[from_worker] := "broken" ||
+                    status[to_worker] := "active";
                     final[to_worker] := 0;
                 end with;
             end either;
@@ -86,25 +106,42 @@ begin RegularWorker:
     call work();
 end process;
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "29169fa9" /\ chksum(tla) = "d2cf18b2")
-VARIABLES input, queue, result, pc, stack, total, count, final, consumed,
-    assignments
+\* BEGIN TRANSLATION (chksum(pcal) = "b23ac358" /\ chksum(tla) = "df3b07dc")
+VARIABLES input, result, queue, status, pc, stack
 
-vars == << input, queue, result, pc, stack, total, count, final, consumed,
+(* define statement *)
+ActiveWorkers == {w \in Workers: status[w] = "active"}
+HealthyWorkers == {w \in Workers: status[w] /= "broken"}
+TypeInvariant ==
+    /\ status \in [Workers -> {"active", "inactive", "broken"}]
+    /\ \A w \in Workers:
+        /\ Len(queue[w]) <= ItemCount
+        /\ \A item \in 1..Len(queue[w]):
+            queue[w][item] \in ItemRange
+        /\
+            \/ result[w].total = NULL
+            \/ result[w].total <= SumSeq(input)
+        /\
+            \/ result[w].count = NULL
+            \/ result[w].count <= ItemCount
+
+VARIABLES total, count, final, assignments
+
+vars == << input, result, queue, status, pc, stack, total, count, final,
     assignments >>
 
 ProcSet == {Reducer} \union (FairWorkers) \union (UnfairWorkers)
 
 Init == (* Global variables *)
     /\ input \in PossibleInputs
-    /\ queue = [w \in Workers |-> <<>>]
     /\ result = [w \in Workers |-> [total |-> NULL, count |-> NULL]]
+    /\ queue = [w \in Workers |-> <<>>]
+    /\ status = [w \in Workers |-> "active"]
     (* Procedure work *)
     /\ total = [self \in ProcSet |-> 0]
     /\ count = [self \in ProcSet |-> 0]
     (* Process reducer *)
     /\ final = [w \in Workers |-> 0]
-    /\ consumed = [w \in Workers |-> FALSE]
     /\ assignments = [w \in Workers |-> <<>>]
     /\ stack = [self \in ProcSet |-> <<>>]
     /\ pc = [self \in ProcSet |-> CASE self = Reducer -> "Schedule"
@@ -115,8 +152,8 @@ WaitForQueue(self) ==
     /\ pc[self] = "WaitForQueue"
     /\ queue[self] /= <<>>
     /\ pc' = [pc EXCEPT ![self] = "Process"]
-    /\ UNCHANGED << input, queue, result, stack, total,
-        count, final, consumed, assignments >>
+    /\ UNCHANGED << input, result, queue, status, stack,
+        total, count, final, assignments >>
 
 Process(self) ==
     /\ pc[self] = "Process"
@@ -129,15 +166,15 @@ Process(self) ==
         ELSE
             /\ pc' = [pc EXCEPT ![self] = "Result"]
             /\ UNCHANGED << queue, total, count >>
-    /\ UNCHANGED << input, result, stack, final, consumed,
+    /\ UNCHANGED << input, result, status, stack, final,
             assignments >>
 
 Result(self) ==
     /\ pc[self] = "Result"
     /\ result' = [result EXCEPT ![self] = [total |-> total[self], count |-> count[self]]]
     /\ pc' = [pc EXCEPT ![self] = "WaitForQueue"]
-    /\ UNCHANGED << input, queue, stack, total, count, final,
-        consumed, assignments >>
+    /\ UNCHANGED << input, queue, status, stack, total, count,
+        final, assignments >>
 
 work(self) == WaitForQueue(self) \/ Process(self) \/ Result(self)
 
@@ -149,42 +186,40 @@ Schedule ==
             IN PT!SelectSeqByIndex(input, LAMBDA i: i % Len(worker_order) = offset) ]
         /\ assignments' = queue'
     /\ pc' = [pc EXCEPT ![Reducer] = "ReduceResult"]
-    /\ UNCHANGED << input, result, stack, total, count, final,
-        consumed >>
+    /\ UNCHANGED << input, result, status, stack, total, count, final >>
 
 ReduceResult ==
     /\ pc[Reducer] = "ReduceResult"
-    /\ IF \E w \in Workers: ~consumed[w]
+    /\ IF ActiveWorkers /= {}
         THEN
             /\
                 \/
-                    /\ \E w \in {w \in Workers:
-                            result[w].count = Len(assignments[w]) /\ ~consumed[w]}:
+                    /\ \E w \in {w \in ActiveWorkers:
+                            result[w].count = Len(assignments[w])}:
                         /\ final' = [final EXCEPT ![w] = result[w].total]
-                        /\ consumed' = [consumed EXCEPT ![w] = TRUE]
+                        /\ status' = [status EXCEPT ![w] = "inactive"]
                     /\ UNCHANGED << queue, assignments >>
                 \/
-                    /\ \E from_worker \in {w \in UnfairWorkers:
-                            ~consumed[w] /\ result[w].count /= Len(assignments[w])}:
-                        \E to_worker \in FairWorkers:
-                        /\ assignments' = [assignments EXCEPT ![to_worker] = assignments[to_worker] \o assignments[from_worker]]
-                        /\ queue' = [queue EXCEPT ![to_worker] = queue[to_worker] \o assignments' [from_worker]]
-                        /\ consumed' = [consumed EXCEPT ![from_worker] = TRUE,
-                            ![to_worker] = FALSE]
-                        /\ final' = [final EXCEPT ![to_worker] = 0]
+                    /\ \E from_worker \in ActiveWorkers \ FairWorkers:
+                        \E to_worker \in HealthyWorkers \ {from_worker}:
+                            /\ assignments' = [assignments EXCEPT ![to_worker] = assignments[to_worker] \o assignments[from_worker]]
+                            /\ queue' = [queue EXCEPT ![to_worker] = queue[to_worker] \o assignments' [from_worker]]
+                            /\ status' = [status EXCEPT ![from_worker] = "broken",
+                                ![to_worker] = "active"]
+                            /\ final' = [final EXCEPT ![to_worker] = 0]
             /\ pc' = [pc EXCEPT ![Reducer] = "ReduceResult"]
         ELSE
             /\ pc' = [pc EXCEPT ![Reducer] = "Finish"]
-            /\ UNCHANGED << queue, final, consumed, assignments >>
+            /\ UNCHANGED << queue, status, final, assignments >>
     /\ UNCHANGED << input, result, stack, total, count >>
 
 Finish ==
     /\ pc[Reducer] = "Finish"
     /\ Assert(SumSeq(final) = SumSeq(input),
-        "Failure of assertion at line 76, column 9.")
+        "Failure of assertion at line 96, column 9.")
     /\ pc' = [pc EXCEPT ![Reducer] = "Done"]
-    /\ UNCHANGED << input, queue, result, stack, total, count, final,
-        consumed, assignments >>
+    /\ UNCHANGED << input, result, queue, status, stack, total, count,
+        final, assignments >>
 
 reducer == Schedule \/ ReduceResult \/ Finish
 
@@ -198,7 +233,7 @@ FairWorker(self) ==
     /\ total' = [total EXCEPT ![self] = 0]
     /\ count' = [count EXCEPT ![self] = 0]
     /\ pc' = [pc EXCEPT ![self] = "WaitForQueue"]
-    /\ UNCHANGED << input, queue, result, final, consumed,
+    /\ UNCHANGED << input, result, queue, status, final,
         assignments >>
 
 fair_worker(self) == FairWorker(self)
@@ -213,7 +248,7 @@ RegularWorker(self) ==
     /\ total' = [total EXCEPT ![self] = 0]
     /\ count' = [count EXCEPT ![self] = 0]
     /\ pc' = [pc EXCEPT ![self] = "WaitForQueue"]
-    /\ UNCHANGED << input, queue, result, final, consumed,
+    /\ UNCHANGED << input, result, queue, status, final,
         assignments >>
 
 worker(self) == RegularWorker(self)
