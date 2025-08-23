@@ -1,5 +1,10 @@
 deadlock_detection: false
 
+# options:
+  # max_concurrent_actions: 1
+
 action_options:
+  "Server.BumpVersion":
+    max_actions: 1
   "Server#.GossipTimer":
     max_concurrent_actions: 1

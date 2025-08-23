@@ -7,6 +7,6 @@ install:
 	rm -rf fizzbee-v0.1.2-linux_x86*
 
 quickstart:
-	@./bin/fizz quickstart/spec.fizz
+	@./bin/fizz --internal_profile --max_runs 100 quickstart/spec.fizz 
 
 .PHONY: quickstart
