@@ -6,16 +6,16 @@ CONSTANT ThreadsMin, ThreadsMax
 Threads == ThreadsMin..ThreadsMax
 
 (*--algorithm dekker
-
-variables flag = [t \in Threads |-> FALSE],
+variables
+    flag = [t \in Threads |-> FALSE],
     next_thread \in Threads;
 
 procedure thread()
 begin
     P1: flag[self] := TRUE;
-    P2: 
+    P2:
         while \E t \in Threads \ {self}: flag[t] do
-            P2_1: 
+            P2_1:
                 if next_thread # self then
                     p2_1_1: flag[self] := FALSE;
                     p2_1_2: await next_thread = self;
@@ -156,7 +156,7 @@ Spec ==
 
 Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
-\* END TRANSLATION 
+\* END TRANSLATION
 
 AtMostOneCritical ==
     \A t1, t2 \in Threads:
