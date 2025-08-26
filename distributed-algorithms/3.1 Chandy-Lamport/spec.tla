@@ -4,20 +4,6 @@ EXTENDS Integers, Sequences, FiniteSets, TLC
 
 CONSTANTS Accounts, Transfers, Readers, NULL
 
-Readers_ == Permutations(Readers)
-
-ReduceSet( op(_, _) , set, acc) ==
-    LET f[s \in SUBSET set] == \* here's where the magic is
-        IF s = {} THEN acc
-        ELSE LET x == CHOOSE x \in s: TRUE
-            IN op(x, f[s \ {x}])
-    IN f[set]
-ReduceSeq( op(_, _) , seq, acc) ==
-    ReduceSet( LAMBDA i, a: op(seq[i], a) , DOMAIN seq, acc)
-SumSnapshotItem(s) == s.state + ReduceSeq( LAMBDA m, acc: m.amount + acc , s.messages, 0)
-SumSnapshot(snapshot) ==
-    ReduceSet( LAMBDA n, acc: SumSnapshotItem(snapshot[n]) + acc , Accounts, 0)
-
 (*--algorithm spec
 variables
     network   = [n \in Accounts |-> <<>>],
@@ -27,7 +13,6 @@ variables
 
 define
     SnapshotFinished == \A s \in DOMAIN snapshot: snapshot[s] /= NULL /\ snapshot[s].waiting = {}
-    SnapshotCorrect == (~SnapshotFinished) \/ (SumSnapshot(snapshot) = Cardinality(Accounts) * 100)
 end define;
 
 macro broadcast(dst, msg) begin
@@ -87,18 +72,17 @@ fair process reader \in SUBSET Readers
 begin
     Snapshot:
         with n \in Accounts do
-            network[n] := Append(@, [type |-> "Snapshot",src  |-> NULL]);
+            network[n] := Append(@, [type |-> "Snapshot", src  |-> NULL]);
         end with;
 end process;
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "6df3191c" /\ chksum(tla) = "aa7d8c10")
-\* Label Transfer of process node at line 48 col 17 changed to Transfer_
-\* Label Snapshot of process node at line 60 col 17 changed to Snapshot_
+\* BEGIN TRANSLATION (chksum(pcal) = "1880da8b" /\ chksum(tla) = "c6e1d2a7")
+\* Label Transfer of process node at line 33 col 17 changed to Transfer_
+\* Label Snapshot of process node at line 45 col 17 changed to Snapshot_
 VARIABLES network, in_peers, out_peers, snapshot, pc
 
 (* define statement *)
 SnapshotFinished == \A s \in DOMAIN snapshot: snapshot[s] /= NULL /\ snapshot[s].waiting = {}
-SnapshotCorrect == (~SnapshotFinished) \/ (SumSnapshot(snapshot) = Cardinality(Accounts) * 100)
 
 VARIABLES state, msg, src, dst
 
@@ -216,6 +200,22 @@ Spec ==
 Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
 \* END TRANSLATION
+
+Readers_ == Permutations(Readers)
+
+ReduceSet( op(_, _) , set, acc) ==
+    LET f[s \in SUBSET set] == \* here's where the magic is
+        IF s = {} THEN acc
+        ELSE LET x == CHOOSE x \in s: TRUE
+            IN op(x, f[s \ {x}])
+    IN f[set]
+ReduceSeq( op(_, _) , seq, acc) ==
+    ReduceSet( LAMBDA i, a: op(seq[i], a) , DOMAIN seq, acc)
+SumSnapshotItem(si) == si.state + ReduceSeq( LAMBDA m, acc: m.amount + acc , si.messages, 0)
+SumSnapshot(s) ==
+    ReduceSet( LAMBDA acct, acc: SumSnapshotItem(s[acct]) + acc , Accounts, 0)
+
+SnapshotCorrect == (~SnapshotFinished) \/ (SumSnapshot(snapshot) = Cardinality(Accounts) * 100)
 
 SnapshotTerminates == <>(SnapshotFinished)
 
