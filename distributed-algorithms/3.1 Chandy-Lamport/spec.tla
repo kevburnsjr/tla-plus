@@ -1,28 +1,28 @@
 --------------------------------- MODULE spec ----------------------------------
 
-EXTENDS Integers, Sequences, FiniteSets
+EXTENDS Integers, Sequences, FiniteSets, TLC
 
 CONSTANTS Nodes, Writers, NULL
 
 (*--algorithm spec
 variables
     network   = [n \in Nodes |-> <<>>],
-    in_peers  = [n \in Nodes |-> { Nodes \ {n} }], \* TODO - Define alternate peer topologies
-    out_peers = [n \in Nodes |-> { Nodes \ {n} }], \* TODO - Define alternate peer topologies
-    snapshot  = [n \in Nodes |-> NULL],           \* Map from node to record
+    in_peers  = [n \in Nodes |-> Nodes \ {n}], \* TODO - Define alternate peer topologies
+    out_peers = [n \in Nodes |-> Nodes \ {n}], \* TODO - Define alternate peer topologies
+    snapshot  = [n \in Nodes |-> NULL],        \* Map from node to record
     complete  = FALSE,
     transfers = <<>>;
 
 macro send_all(dst, msg) begin
-    network := [n \in Nodes |-> IF n \in dst THEN network[n] = Append(network[n], msg) ELSE network[n]];
+    network := [n \in DOMAIN network |-> IF n \in dst THEN Append(network[n], msg) ELSE network[n]];
 end macro;
 
-process node \in Nodes
+fair process node \in Nodes
 variables
     state = 100,
     msg = NULL;
 begin
-    Node:
+    NodeWait:
         await network[self] /= <<>>;
         msg := Head(network[self]);
         network[self] := Tail(network[self]);
@@ -37,7 +37,7 @@ begin
                     end if;
                     state := state + msg.amount;
                 end if;
-            goto Node;
+                goto NodeWait;
         elsif msg.type = "Snapshot" then
             Snapshot:
                 if snapshot[self] = NULL then
@@ -47,21 +47,21 @@ begin
                         state    |-> state
                     ];
                     msg.src := self;
-                    send_all(out_peers[self] \ {msg.src}, msg);
+                    send_all(out_peers[self], msg);
                 else
                     snapshot[self].waiting := snapshot[self].waiting \ {msg.src};
                 end if;
-                goto Node;
+                goto NodeWait;
         end if;
 end process;
 
-process writer \in Writers
+fair process writer \in Writers
 variables
     src \in Nodes;
     dst \in Nodes \ {src};
     t = NULL
 begin
-    WInit:
+    WriterInit:
         transfers := Append(transfers, [type |-> "Transfer", amount |-> 10, src |-> src, dst |-> dst]);
     Transfer:
         while transfers /= <<>> do
@@ -72,7 +72,7 @@ begin
         end while;
 end process;
 
-process reader = "Reader"
+fair process reader = "Reader"
 begin
     Snapshot:
         with n \in Nodes do
@@ -84,7 +84,7 @@ begin
         \* await \A s \in snapshot : s /= NULL /\ s.waiting = <<>>;
 end process;
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "61ec2acb" /\ chksum(tla) = "d9d4ebd4")
+\* BEGIN TRANSLATION (chksum(pcal) = "d8e4bcd2" /\ chksum(tla) = "2f787b7a")
 \* Label Transfer of process node at line 31 col 17 changed to Transfer_
 \* Label Snapshot of process node at line 43 col 17 changed to Snapshot_
 VARIABLES network, in_peers, out_peers, snapshot, complete, transfers, pc,
@@ -97,8 +97,8 @@ ProcSet == (Nodes) \union (Writers) \union {"Reader"}
 
 Init == (* Global variables *)
     /\ network = [n \in Nodes |-> <<>>]
-    /\ in_peers = [n \in Nodes |-> {Nodes \ {n}}]
-    /\ out_peers = [n \in Nodes |-> {Nodes \ {n}}]
+    /\ in_peers = [n \in Nodes |-> Nodes \ {n}]
+    /\ out_peers = [n \in Nodes |-> Nodes \ {n}]
     /\ snapshot = [n \in Nodes |-> NULL]
     /\ complete = FALSE
     /\ transfers = <<>>
@@ -109,12 +109,12 @@ Init == (* Global variables *)
     /\ src \in [Writers -> Nodes]
     /\ dst \in [Writers -> Nodes \ {src[CHOOSE self \in Writers: TRUE]}]
     /\ t = [self \in Writers |-> NULL]
-    /\ pc = [self \in ProcSet |-> CASE self \in Nodes -> "Node"
-        [] self \in Writers -> "WInit"
+    /\ pc = [self \in ProcSet |-> CASE self \in Nodes -> "NodeWait"
+        [] self \in Writers -> "WriterInit"
         [] self = "Reader" -> "Snapshot"]
 
-Node(self) ==
-    /\ pc[self] = "Node"
+NodeWait(self) ==
+    /\ pc[self] = "NodeWait"
     /\ network[self] /= <<>>
     /\ msg' = [msg EXCEPT ![self] = Head(network[self])]
     /\ network' = [network EXCEPT ![self] = Tail(network[self])]
@@ -146,7 +146,7 @@ Transfer_(self) ==
                     /\ UNCHANGED snapshot
             /\ state' = [state EXCEPT ![self] = state[self] + msg[self].amount]
             /\ UNCHANGED network
-    /\ pc' = [pc EXCEPT ![self] = "Node"]
+    /\ pc' = [pc EXCEPT ![self] = "NodeWait"]
     /\ UNCHANGED << in_peers, out_peers, complete, transfers,
         msg, src, dst, t >>
 
@@ -160,18 +160,18 @@ Snapshot_(self) ==
                     state |-> state[self]
                 ]]
             /\ msg' = [msg EXCEPT ![self].src = self]
-            /\ network' = [n \in Nodes |-> IF n \in (out_peers[self] \ {msg' [self].src}) THEN network[n] = Append(network[n], msg' [self]) ELSE network[n]]
+            /\ network' = [n \in DOMAIN network |-> IF n \in (out_peers[self]) THEN Append(network[n], msg' [self]) ELSE network[n]]
         ELSE
             /\ snapshot' = [snapshot EXCEPT ![self].waiting = snapshot[self].waiting \ {msg[self].src}]
             /\ UNCHANGED << network, msg >>
-    /\ pc' = [pc EXCEPT ![self] = "Node"]
+    /\ pc' = [pc EXCEPT ![self] = "NodeWait"]
     /\ UNCHANGED << in_peers, out_peers, complete, transfers,
         state, src, dst, t >>
 
-node(self) == Node(self) \/ Transfer_(self) \/ Snapshot_(self)
+node(self) == NodeWait(self) \/ Transfer_(self) \/ Snapshot_(self)
 
-WInit(self) ==
-    /\ pc[self] = "WInit"
+WriterInit(self) ==
+    /\ pc[self] = "WriterInit"
     /\ transfers' = Append(transfers, [type |-> "Transfer", amount |-> 10, src |-> src[self], dst |-> dst[self]])
     /\ pc' = [pc EXCEPT ![self] = "Transfer"]
     /\ UNCHANGED << network, in_peers, out_peers, snapshot,
@@ -196,7 +196,7 @@ Send(self) ==
     /\ UNCHANGED << in_peers, out_peers, snapshot, complete, state,
         msg, src, dst >>
 
-writer(self) == WInit(self) \/ Transfer(self) \/ Send(self)
+writer(self) == WriterInit(self) \/ Transfer(self) \/ Send(self)
 
 Snapshot ==
     /\ pc["Reader"] = "Snapshot"
@@ -221,11 +221,17 @@ Next == reader
 \/ (\E self \in Writers: writer(self))
 \/ Terminating
 
-Spec == Init /\ [][Next]_vars
+Spec ==
+    /\ Init /\ [][Next]_vars
+    /\ \A self \in Nodes: WF_vars(node(self))
+    /\ \A self \in Writers: WF_vars(writer(self))
+    /\ WF_vars(reader)
 
 Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
 \* END TRANSLATION 
+
+SnapshotTerminates == <>(\A s \in DOMAIN snapshot: snapshot[s] /= NULL /\ snapshot[s].waiting = {})
 
 ================================================================================
 
