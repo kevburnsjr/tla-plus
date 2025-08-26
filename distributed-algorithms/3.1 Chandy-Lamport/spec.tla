@@ -2,7 +2,7 @@
 
 EXTENDS Integers, Sequences, FiniteSets, TLC
 
-CONSTANTS Nodes, Transfers, NULL
+CONSTANTS Nodes, Transfers, Readers, NULL
 
 ReduceSet( op(_, _) , set, acc) ==
     LET f[s \in SUBSET set] == \* here's where the magic is
@@ -23,7 +23,7 @@ variables
     network   = [n \in Nodes |-> <<>>],
     in_peers  = [n \in Nodes |-> Nodes \ {n}], \* TODO - Define alternate peer topologies
     out_peers = [n \in Nodes |-> Nodes \ {n}], \* TODO - Define alternate peer topologies
-    snapshot  = [n \in Nodes |-> NULL];        \* Map from node to record;
+    snapshot  = [n \in Nodes |-> NULL];
 define
     SnapshotFinished == \A s \in DOMAIN snapshot: snapshot[s] /= NULL /\ snapshot[s].waiting = {}
     SnapshotCorrect == (~SnapshotFinished) \/ (SumSnapshot(snapshot) = Cardinality(Nodes) * 100)
@@ -82,7 +82,7 @@ begin
         network[src] := Append(@, [type |-> "Transfer", amount |-> 10, src |-> src, dst |-> dst]);
 end process;
 
-fair process reader = "Reader"
+fair process reader \in Readers
 begin
     Snapshot:
         with n \in Nodes do
@@ -93,7 +93,7 @@ begin
         end with;
 end process;
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "17d34a36" /\ chksum(tla) = "73d5a6c1")
+\* BEGIN TRANSLATION (chksum(pcal) = "eaf98ef2" /\ chksum(tla) = "d836fde8")
 \* Label Transfer of process node at line 47 col 17 changed to Transfer_
 \* Label Snapshot of process node at line 59 col 17 changed to Snapshot_
 VARIABLES network, in_peers, out_peers, snapshot, pc
@@ -107,7 +107,7 @@ VARIABLES state, msg, src, dst
 vars == << network, in_peers, out_peers, snapshot, pc, state, msg, src, dst
 >>
 
-ProcSet == (Nodes) \union (Transfers) \union {"Reader"}
+ProcSet == (Nodes) \union (Transfers) \union (Readers)
 
 Init == (* Global variables *)
     /\ network = [n \in Nodes |-> <<>>]
@@ -122,7 +122,7 @@ Init == (* Global variables *)
     /\ dst = [self \in Transfers |-> NULL]
     /\ pc = [self \in ProcSet |-> CASE self \in Nodes -> "NodeWait"
         [] self \in Transfers -> "Transfer"
-        [] self = "Reader" -> "Snapshot"]
+        [] self \in Readers -> "Snapshot"]
 
 NodeWait(self) ==
     /\ pc[self] = "NodeWait"
@@ -189,34 +189,34 @@ Transfer(self) ==
 
 transfer(self) == Transfer(self)
 
-Snapshot ==
-    /\ pc["Reader"] = "Snapshot"
+Snapshot(self) ==
+    /\ pc[self] = "Snapshot"
     /\ \E n \in Nodes:
         network' = [network EXCEPT ![n] = Append(@, [
                 type |-> "Snapshot",
                 src |-> NULL
             ])]
-    /\ pc' = [pc EXCEPT !["Reader"] = "Done"]
-    /\ UNCHANGED << in_peers, out_peers, snapshot, state, msg, src,
-        dst >>
+    /\ pc' = [pc EXCEPT ![self] = "Done"]
+    /\ UNCHANGED << in_peers, out_peers, snapshot, state, msg,
+        src, dst >>
 
-reader == Snapshot
+reader(self) == Snapshot(self)
 
 (* Allow infinite stuttering to prevent deadlock on termination. *)
 Terminating ==
     /\ \A self \in ProcSet: pc[self] = "Done"
     /\ UNCHANGED vars
 
-Next == reader
-\/ (\E self \in Nodes: node(self))
+Next == (\E self \in Nodes: node(self))
 \/ (\E self \in Transfers: transfer(self))
+\/ (\E self \in Readers: reader(self))
 \/ Terminating
 
 Spec ==
     /\ Init /\ [][Next]_vars
     /\ \A self \in Nodes: WF_vars(node(self))
     /\ \A self \in Transfers: WF_vars(transfer(self))
-    /\ WF_vars(reader)
+    /\ \A self \in Readers: WF_vars(reader(self))
 
 Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
