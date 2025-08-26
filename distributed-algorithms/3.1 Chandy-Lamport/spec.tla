@@ -2,7 +2,9 @@
 
 EXTENDS Integers, Sequences, FiniteSets, TLC
 
-CONSTANTS Nodes, Transfers, Readers, NULL
+CONSTANTS Accounts, Transfers, Readers, NULL
+
+Readers_ == Permutations(Readers)
 
 ReduceSet( op(_, _) , set, acc) ==
     LET f[s \in SUBSET set] == \* here's where the magic is
@@ -10,30 +12,29 @@ ReduceSet( op(_, _) , set, acc) ==
         ELSE LET x == CHOOSE x \in s: TRUE
             IN op(x, f[s \ {x}])
     IN f[set]
-
 ReduceSeq( op(_, _) , seq, acc) ==
     ReduceSet( LAMBDA i, a: op(seq[i], a) , DOMAIN seq, acc)
-
 SumSnapshotItem(s) == s.state + ReduceSeq( LAMBDA m, acc: m.amount + acc , s.messages, 0)
 SumSnapshot(snapshot) ==
-    ReduceSet( LAMBDA n, acc: SumSnapshotItem(snapshot[n]) + acc , Nodes, 0)
+    ReduceSet( LAMBDA n, acc: SumSnapshotItem(snapshot[n]) + acc , Accounts, 0)
 
 (*--algorithm spec
 variables
-    network   = [n \in Nodes |-> <<>>],
-    in_peers  = [n \in Nodes |-> Nodes \ {n}], \* TODO - Define alternate peer topologies
-    out_peers = [n \in Nodes |-> Nodes \ {n}], \* TODO - Define alternate peer topologies
-    snapshot  = [n \in Nodes |-> NULL];
+    network   = [n \in Accounts |-> <<>>],
+    in_peers  = [n \in Accounts |-> Accounts \ {n}], \* TODO - Define alternate peer topologies
+    out_peers = [n \in Accounts |-> Accounts \ {n}], \* TODO - Define alternate peer topologies
+    snapshot  = [n \in Accounts |-> NULL];
+
 define
     SnapshotFinished == \A s \in DOMAIN snapshot: snapshot[s] /= NULL /\ snapshot[s].waiting = {}
-    SnapshotCorrect == (~SnapshotFinished) \/ (SumSnapshot(snapshot) = Cardinality(Nodes) * 100)
+    SnapshotCorrect == (~SnapshotFinished) \/ (SumSnapshot(snapshot) = Cardinality(Accounts) * 100)
 end define;
 
-macro send_all(dst, msg) begin
+macro broadcast(dst, msg) begin
     network := [n \in DOMAIN network |-> IF n \in dst THEN Append(network[n], msg) ELSE network[n]];
 end macro;
 
-fair process node \in Nodes
+fair process node \in Accounts
 variables
     state = 100,
     msg = NULL;
@@ -63,7 +64,7 @@ begin
                         state    |-> state
                     ];
                     msg.src := self;
-                    send_all(out_peers[self], msg);
+                    broadcast(out_peers[self], msg);
                 else
                     snapshot[self].waiting := snapshot[self].waiting \ {msg.src};
                 end if;
@@ -77,52 +78,49 @@ variables
     dst = NULL
 begin
     Transfer:
-        src := src \in Nodes;
-        dst := dst \in Nodes \ {src};
+        src := src \in Accounts;
+        dst := dst \in Accounts \ {src};
         network[src] := Append(@, [type |-> "Transfer", amount |-> 10, src |-> src, dst |-> dst]);
 end process;
 
-fair process reader \in Readers
+fair process reader \in SUBSET Readers
 begin
     Snapshot:
-        with n \in Nodes do
-            network[n] := Append(@, [
-                type |-> "Snapshot",
-                src  |-> NULL
-            ]);
+        with n \in Accounts do
+            network[n] := Append(@, [type |-> "Snapshot",src  |-> NULL]);
         end with;
 end process;
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "eaf98ef2" /\ chksum(tla) = "d836fde8")
-\* Label Transfer of process node at line 47 col 17 changed to Transfer_
-\* Label Snapshot of process node at line 59 col 17 changed to Snapshot_
+\* BEGIN TRANSLATION (chksum(pcal) = "6df3191c" /\ chksum(tla) = "aa7d8c10")
+\* Label Transfer of process node at line 48 col 17 changed to Transfer_
+\* Label Snapshot of process node at line 60 col 17 changed to Snapshot_
 VARIABLES network, in_peers, out_peers, snapshot, pc
 
 (* define statement *)
 SnapshotFinished == \A s \in DOMAIN snapshot: snapshot[s] /= NULL /\ snapshot[s].waiting = {}
-SnapshotCorrect == (~SnapshotFinished) \/ (SumSnapshot(snapshot) = Cardinality(Nodes) * 100)
+SnapshotCorrect == (~SnapshotFinished) \/ (SumSnapshot(snapshot) = Cardinality(Accounts) * 100)
 
 VARIABLES state, msg, src, dst
 
 vars == << network, in_peers, out_peers, snapshot, pc, state, msg, src, dst
 >>
 
-ProcSet == (Nodes) \union (Transfers) \union (Readers)
+ProcSet == (Accounts) \union (Transfers) \union (SUBSET Readers)
 
 Init == (* Global variables *)
-    /\ network = [n \in Nodes |-> <<>>]
-    /\ in_peers = [n \in Nodes |-> Nodes \ {n}]
-    /\ out_peers = [n \in Nodes |-> Nodes \ {n}]
-    /\ snapshot = [n \in Nodes |-> NULL]
+    /\ network = [n \in Accounts |-> <<>>]
+    /\ in_peers = [n \in Accounts |-> Accounts \ {n}]
+    /\ out_peers = [n \in Accounts |-> Accounts \ {n}]
+    /\ snapshot = [n \in Accounts |-> NULL]
     (* Process node *)
-    /\ state = [self \in Nodes |-> 100]
-    /\ msg = [self \in Nodes |-> NULL]
+    /\ state = [self \in Accounts |-> 100]
+    /\ msg = [self \in Accounts |-> NULL]
     (* Process transfer *)
     /\ src = [self \in Transfers |-> NULL]
     /\ dst = [self \in Transfers |-> NULL]
-    /\ pc = [self \in ProcSet |-> CASE self \in Nodes -> "NodeWait"
+    /\ pc = [self \in ProcSet |-> CASE self \in Accounts -> "NodeWait"
         [] self \in Transfers -> "Transfer"
-        [] self \in Readers -> "Snapshot"]
+        [] self \in SUBSET Readers -> "Snapshot"]
 
 NodeWait(self) ==
     /\ pc[self] = "NodeWait"
@@ -181,8 +179,8 @@ node(self) == NodeWait(self) \/ Transfer_(self) \/ Snapshot_(self)
 
 Transfer(self) ==
     /\ pc[self] = "Transfer"
-    /\ src' = [src EXCEPT ![self] = src[self] \in Nodes]
-    /\ dst' = [dst EXCEPT ![self] = dst[self] \in Nodes \ {src' [self]}]
+    /\ src' = [src EXCEPT ![self] = src[self] \in Accounts]
+    /\ dst' = [dst EXCEPT ![self] = dst[self] \in Accounts \ {src' [self]}]
     /\ network' = [network EXCEPT ![src' [self]] = Append(@, [type |-> "Transfer", amount |-> 10, src |-> src' [self], dst |-> dst' [self]])]
     /\ pc' = [pc EXCEPT ![self] = "Done"]
     /\ UNCHANGED << in_peers, out_peers, snapshot, state, msg >>
@@ -191,11 +189,8 @@ transfer(self) == Transfer(self)
 
 Snapshot(self) ==
     /\ pc[self] = "Snapshot"
-    /\ \E n \in Nodes:
-        network' = [network EXCEPT ![n] = Append(@, [
-                type |-> "Snapshot",
-                src |-> NULL
-            ])]
+    /\ \E n \in Accounts:
+        network' = [network EXCEPT ![n] = Append(@, [type |-> "Snapshot", src |-> NULL])]
     /\ pc' = [pc EXCEPT ![self] = "Done"]
     /\ UNCHANGED << in_peers, out_peers, snapshot, state, msg,
         src, dst >>
@@ -207,16 +202,16 @@ Terminating ==
     /\ \A self \in ProcSet: pc[self] = "Done"
     /\ UNCHANGED vars
 
-Next == (\E self \in Nodes: node(self))
+Next == (\E self \in Accounts: node(self))
 \/ (\E self \in Transfers: transfer(self))
-\/ (\E self \in Readers: reader(self))
+\/ (\E self \in SUBSET Readers: reader(self))
 \/ Terminating
 
 Spec ==
     /\ Init /\ [][Next]_vars
-    /\ \A self \in Nodes: WF_vars(node(self))
+    /\ \A self \in Accounts: WF_vars(node(self))
     /\ \A self \in Transfers: WF_vars(transfer(self))
-    /\ \A self \in Readers: WF_vars(reader(self))
+    /\ \A self \in SUBSET Readers: WF_vars(reader(self))
 
 Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
