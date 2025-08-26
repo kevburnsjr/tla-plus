@@ -19,12 +19,12 @@ macro broadcast(dst, msg) begin
     network := [n \in DOMAIN network |-> IF n \in dst THEN Append(network[n], msg) ELSE network[n]];
 end macro;
 
-fair process node \in Accounts
+fair process account \in Accounts
 variables
     state = 100,
     msg = NULL;
 begin
-    NodeWait:
+    Wait:
         await network[self] /= <<>>;
         msg := Head(network[self]);
         network[self] := Tail(network[self]);
@@ -39,7 +39,7 @@ begin
                     end if;
                     state := state + msg.amount;
                 end if;
-                goto NodeWait;
+                goto Wait;
         elsif msg.type = "Snapshot" then
             Snapshot:
                 if snapshot[self] = NULL then
@@ -53,7 +53,7 @@ begin
                 else
                     snapshot[self].waiting := snapshot[self].waiting \ {msg.src};
                 end if;
-                goto NodeWait;
+                goto Wait;
         end if;
 end process;
 
@@ -76,9 +76,9 @@ begin
         end with;
 end process;
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "1880da8b" /\ chksum(tla) = "c6e1d2a7")
-\* Label Transfer of process node at line 33 col 17 changed to Transfer_
-\* Label Snapshot of process node at line 45 col 17 changed to Snapshot_
+\* BEGIN TRANSLATION (chksum(pcal) = "93f482be" /\ chksum(tla) = "2ffedd64")
+\* Label Transfer of process account at line 33 col 17 changed to Transfer_
+\* Label Snapshot of process account at line 45 col 17 changed to Snapshot_
 VARIABLES network, in_peers, out_peers, snapshot, pc
 
 (* define statement *)
@@ -96,18 +96,18 @@ Init == (* Global variables *)
     /\ in_peers = [n \in Accounts |-> Accounts \ {n}]
     /\ out_peers = [n \in Accounts |-> Accounts \ {n}]
     /\ snapshot = [n \in Accounts |-> NULL]
-    (* Process node *)
+    (* Process account *)
     /\ state = [self \in Accounts |-> 100]
     /\ msg = [self \in Accounts |-> NULL]
     (* Process transfer *)
     /\ src = [self \in Transfers |-> NULL]
     /\ dst = [self \in Transfers |-> NULL]
-    /\ pc = [self \in ProcSet |-> CASE self \in Accounts -> "NodeWait"
+    /\ pc = [self \in ProcSet |-> CASE self \in Accounts -> "Wait"
         [] self \in Transfers -> "Transfer"
         [] self \in SUBSET Readers -> "Snapshot"]
 
-NodeWait(self) ==
-    /\ pc[self] = "NodeWait"
+Wait(self) ==
+    /\ pc[self] = "Wait"
     /\ network[self] /= <<>>
     /\ msg' = [msg EXCEPT ![self] = Head(network[self])]
     /\ network' = [network EXCEPT ![self] = Tail(network[self])]
@@ -120,8 +120,7 @@ NodeWait(self) ==
                     /\ pc' = [pc EXCEPT ![self] = "Snapshot_"]
                 ELSE
                     /\ pc' = [pc EXCEPT ![self] = "Done"]
-    /\ UNCHANGED << in_peers, out_peers, snapshot, state, src,
-            dst >>
+    /\ UNCHANGED << in_peers, out_peers, snapshot, state, src, dst >>
 
 Transfer_(self) ==
     /\ pc[self] = "Transfer_"
@@ -139,7 +138,7 @@ Transfer_(self) ==
                     /\ UNCHANGED snapshot
             /\ state' = [state EXCEPT ![self] = state[self] + msg[self].amount]
             /\ UNCHANGED network
-    /\ pc' = [pc EXCEPT ![self] = "NodeWait"]
+    /\ pc' = [pc EXCEPT ![self] = "Wait"]
     /\ UNCHANGED << in_peers, out_peers, msg, src, dst >>
 
 Snapshot_(self) ==
@@ -156,10 +155,10 @@ Snapshot_(self) ==
         ELSE
             /\ snapshot' = [snapshot EXCEPT ![self].waiting = snapshot[self].waiting \ {msg[self].src}]
             /\ UNCHANGED << network, msg >>
-    /\ pc' = [pc EXCEPT ![self] = "NodeWait"]
+    /\ pc' = [pc EXCEPT ![self] = "Wait"]
     /\ UNCHANGED << in_peers, out_peers, state, src, dst >>
 
-node(self) == NodeWait(self) \/ Transfer_(self) \/ Snapshot_(self)
+account(self) == Wait(self) \/ Transfer_(self) \/ Snapshot_(self)
 
 Transfer(self) ==
     /\ pc[self] = "Transfer"
@@ -186,14 +185,14 @@ Terminating ==
     /\ \A self \in ProcSet: pc[self] = "Done"
     /\ UNCHANGED vars
 
-Next == (\E self \in Accounts: node(self))
+Next == (\E self \in Accounts: account(self))
 \/ (\E self \in Transfers: transfer(self))
 \/ (\E self \in SUBSET Readers: reader(self))
 \/ Terminating
 
 Spec ==
     /\ Init /\ [][Next]_vars
-    /\ \A self \in Accounts: WF_vars(node(self))
+    /\ \A self \in Accounts: WF_vars(account(self))
     /\ \A self \in Transfers: WF_vars(transfer(self))
     /\ \A self \in SUBSET Readers: WF_vars(reader(self))
 
