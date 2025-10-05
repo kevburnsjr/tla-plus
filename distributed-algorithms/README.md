@@ -1,3 +1,3 @@
 # Distributed Algorithms
 
-These are TLA specs for algorithms introduced in the book [Distributed Algorithms](https://www.amazon.com/dp/0262037661).
+Original TLA specs for algorithms described in [Distributed Algorithms](https://www.amazon.com/dp/0262037661).
