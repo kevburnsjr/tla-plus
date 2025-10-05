@@ -1,8 +1,10 @@
 --------------------------------- MODULE spec ----------------------------------
 
 EXTENDS Integers, Sequences, FiniteSets, TLC
+CONSTANTS Accounts, Readers, Transfers, NULL
 
-CONSTANTS Accounts, Transfers, Readers, NULL
+Symmetry == Permutations(Readers)
+\union Permutations(Transfers)
 
 (*--algorithm spec
 variables
@@ -21,7 +23,7 @@ end macro;
 
 fair process account \in Accounts
 variables
-    state = 100,
+    balance = 100,
     msg = NULL;
 begin
     Wait:
@@ -31,13 +33,13 @@ begin
         if msg.type = "Transfer" then
             Transfer:
                 if msg.src = self then
-                    state := state - msg.amount;
-                    network[msg.dst] := Append(@, msg);
+                    balance := balance - msg.amount;
+                    broadcast({msg.dst}, msg)
                 else
+                    balance := balance + msg.amount;
                     if snapshot[self] /= NULL /\ msg.src \in snapshot[self].waiting then
                         snapshot[self].messages := Append(@, msg);
                     end if;
-                    state := state + msg.amount;
                 end if;
                 goto Wait;
         elsif msg.type = "Snapshot" then
@@ -46,7 +48,7 @@ begin
                     snapshot[self] := [
                         waiting  |-> in_peers[self] \ {msg.src},
                         messages |-> <<>>,
-                        state    |-> state
+                        balance  |-> balance
                     ];
                     msg.src := self;
                     broadcast(out_peers[self], msg);
@@ -62,7 +64,7 @@ variables
     src = NULL,
     dst = NULL
 begin
-    Transfer:
+    StartTransfer:
         src := src \in Accounts;
         dst := dst \in Accounts \ {src};
         network[src] := Append(@, [type |-> "Transfer", amount |-> 10, src |-> src, dst |-> dst]);
@@ -70,23 +72,21 @@ end process;
 
 fair process reader \in SUBSET Readers
 begin
-    Snapshot:
+    StartSnapshot:
         with n \in Accounts do
             network[n] := Append(@, [type |-> "Snapshot", src  |-> NULL]);
         end with;
 end process;
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "93f482be" /\ chksum(tla) = "2ffedd64")
-\* Label Transfer of process account at line 33 col 17 changed to Transfer_
-\* Label Snapshot of process account at line 45 col 17 changed to Snapshot_
+\* BEGIN TRANSLATION (chksum(pcal) = "6ed0139" /\ chksum(tla) = "33e1e3c5")
 VARIABLES network, in_peers, out_peers, snapshot, pc
 
 (* define statement *)
 SnapshotFinished == \A s \in DOMAIN snapshot: snapshot[s] /= NULL /\ snapshot[s].waiting = {}
 
-VARIABLES state, msg, src, dst
+VARIABLES balance, msg, src, dst
 
-vars == << network, in_peers, out_peers, snapshot, pc, state, msg, src, dst
+vars == << network, in_peers, out_peers, snapshot, pc, balance, msg, src, dst
 >>
 
 ProcSet == (Accounts) \union (Transfers) \union (SUBSET Readers)
@@ -97,14 +97,14 @@ Init == (* Global variables *)
     /\ out_peers = [n \in Accounts |-> Accounts \ {n}]
     /\ snapshot = [n \in Accounts |-> NULL]
     (* Process account *)
-    /\ state = [self \in Accounts |-> 100]
+    /\ balance = [self \in Accounts |-> 100]
     /\ msg = [self \in Accounts |-> NULL]
     (* Process transfer *)
     /\ src = [self \in Transfers |-> NULL]
     /\ dst = [self \in Transfers |-> NULL]
     /\ pc = [self \in ProcSet |-> CASE self \in Accounts -> "Wait"
-        [] self \in Transfers -> "Transfer"
-        [] self \in SUBSET Readers -> "Snapshot"]
+        [] self \in Transfers -> "StartTransfer"
+        [] self \in SUBSET Readers -> "StartSnapshot"]
 
 Wait(self) ==
     /\ pc[self] = "Wait"
@@ -113,42 +113,42 @@ Wait(self) ==
     /\ network' = [network EXCEPT ![self] = Tail(network[self])]
     /\ IF msg' [self].type = "Transfer"
         THEN
-            /\ pc' = [pc EXCEPT ![self] = "Transfer_"]
+            /\ pc' = [pc EXCEPT ![self] = "Transfer"]
         ELSE
             /\ IF msg' [self].type = "Snapshot"
                 THEN
-                    /\ pc' = [pc EXCEPT ![self] = "Snapshot_"]
+                    /\ pc' = [pc EXCEPT ![self] = "Snapshot"]
                 ELSE
                     /\ pc' = [pc EXCEPT ![self] = "Done"]
-    /\ UNCHANGED << in_peers, out_peers, snapshot, state, src, dst >>
+    /\ UNCHANGED << in_peers, out_peers, snapshot, balance, src, dst >>
 
-Transfer_(self) ==
-    /\ pc[self] = "Transfer_"
+Transfer(self) ==
+    /\ pc[self] = "Transfer"
     /\ IF msg[self].src = self
         THEN
-            /\ state' = [state EXCEPT ![self] = state[self] - msg[self].amount]
-            /\ network' = [network EXCEPT ![msg[self].dst] = Append(@, msg[self])]
+            /\ balance' = [balance EXCEPT ![self] = balance[self] - msg[self].amount]
+            /\ network' = [n \in DOMAIN network |-> IF n \in ({msg[self].dst}) THEN Append(network[n], msg[self]) ELSE network[n]]
             /\ UNCHANGED snapshot
         ELSE
+            /\ balance' = [balance EXCEPT ![self] = balance[self] + msg[self].amount]
             /\ IF snapshot[self] /= NULL /\ msg[self].src \in snapshot[self].waiting
                 THEN
                     /\ snapshot' = [snapshot EXCEPT ![self].messages = Append(@, msg[self])]
                 ELSE
                     /\ TRUE
                     /\ UNCHANGED snapshot
-            /\ state' = [state EXCEPT ![self] = state[self] + msg[self].amount]
             /\ UNCHANGED network
     /\ pc' = [pc EXCEPT ![self] = "Wait"]
     /\ UNCHANGED << in_peers, out_peers, msg, src, dst >>
 
-Snapshot_(self) ==
-    /\ pc[self] = "Snapshot_"
+Snapshot(self) ==
+    /\ pc[self] = "Snapshot"
     /\ IF snapshot[self] = NULL
         THEN
             /\ snapshot' = [snapshot EXCEPT ![self] = [
                     waiting |-> in_peers[self] \ {msg[self].src},
                     messages |-> <<>>,
-                    state |-> state[self]
+                    balance |-> balance[self]
                 ]]
             /\ msg' = [msg EXCEPT ![self].src = self]
             /\ network' = [n \in DOMAIN network |-> IF n \in (out_peers[self]) THEN Append(network[n], msg' [self]) ELSE network[n]]
@@ -156,29 +156,30 @@ Snapshot_(self) ==
             /\ snapshot' = [snapshot EXCEPT ![self].waiting = snapshot[self].waiting \ {msg[self].src}]
             /\ UNCHANGED << network, msg >>
     /\ pc' = [pc EXCEPT ![self] = "Wait"]
-    /\ UNCHANGED << in_peers, out_peers, state, src, dst >>
+    /\ UNCHANGED << in_peers, out_peers, balance, src, dst >>
 
-account(self) == Wait(self) \/ Transfer_(self) \/ Snapshot_(self)
+account(self) == Wait(self) \/ Transfer(self) \/ Snapshot(self)
 
-Transfer(self) ==
-    /\ pc[self] = "Transfer"
+StartTransfer(self) ==
+    /\ pc[self] = "StartTransfer"
     /\ src' = [src EXCEPT ![self] = src[self] \in Accounts]
     /\ dst' = [dst EXCEPT ![self] = dst[self] \in Accounts \ {src' [self]}]
     /\ network' = [network EXCEPT ![src' [self]] = Append(@, [type |-> "Transfer", amount |-> 10, src |-> src' [self], dst |-> dst' [self]])]
     /\ pc' = [pc EXCEPT ![self] = "Done"]
-    /\ UNCHANGED << in_peers, out_peers, snapshot, state, msg >>
+    /\ UNCHANGED << in_peers, out_peers, snapshot, balance,
+        msg >>
 
-transfer(self) == Transfer(self)
+transfer(self) == StartTransfer(self)
 
-Snapshot(self) ==
-    /\ pc[self] = "Snapshot"
+StartSnapshot(self) ==
+    /\ pc[self] = "StartSnapshot"
     /\ \E n \in Accounts:
         network' = [network EXCEPT ![n] = Append(@, [type |-> "Snapshot", src |-> NULL])]
     /\ pc' = [pc EXCEPT ![self] = "Done"]
-    /\ UNCHANGED << in_peers, out_peers, snapshot, state, msg,
-        src, dst >>
+    /\ UNCHANGED << in_peers, out_peers, snapshot, balance,
+        msg, src, dst >>
 
-reader(self) == Snapshot(self)
+reader(self) == StartSnapshot(self)
 
 (* Allow infinite stuttering to prevent deadlock on termination. *)
 Terminating ==
@@ -200,17 +201,17 @@ Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
 \* END TRANSLATION
 
-Readers_ == Permutations(Readers)
-
+\* util operations
 ReduceSet( op(_, _) , set, acc) ==
-    LET f[s \in SUBSET set] == \* here's where the magic is
+    LET f[s \in SUBSET set] ==
         IF s = {} THEN acc
         ELSE LET x == CHOOSE x \in s: TRUE
             IN op(x, f[s \ {x}])
     IN f[set]
 ReduceSeq( op(_, _) , seq, acc) ==
     ReduceSet( LAMBDA i, a: op(seq[i], a) , DOMAIN seq, acc)
-SumSnapshotItem(si) == si.state + ReduceSeq( LAMBDA m, acc: m.amount + acc , si.messages, 0)
+SumSnapshotItem(si) ==
+    si.balance + ReduceSeq( LAMBDA m, acc: m.amount + acc , si.messages, 0)
 SumSnapshot(s) ==
     ReduceSet( LAMBDA acct, acc: SumSnapshotItem(s[acct]) + acc , Accounts, 0)
 
