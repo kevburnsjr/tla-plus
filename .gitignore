@@ -8,3 +8,4 @@ states
 *.jar
 *.out
 *.old
+*.dump
