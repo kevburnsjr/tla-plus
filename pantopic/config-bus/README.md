@@ -10,3 +10,7 @@ scalability and efficiency.
 This spec will demonstrate a set of properties that are possible to achieve in this sort of arrangement and the
 constraints that are necessary to achieve them. The answer to whether this set of properties is sufficient to serve the
 needs of etcd's clients given these constraints might very well be yes.
+
+# Constraints
+
+1.

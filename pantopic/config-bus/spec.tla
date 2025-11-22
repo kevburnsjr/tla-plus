@@ -1,7 +1,7 @@
 --------------------------------- MODULE spec ----------------------------------
 
 EXTENDS Integers, TLC, Sequences, FiniteSets
-CONSTANTS Leases, Clients, Keys, NULL
+CONSTANTS Leases, Clients, Keys, NULL, MaxRefresh
 
 (*--algorithm spec
 variables
@@ -14,16 +14,19 @@ variables
     epoch        = 0;
 
 define
-    UnRevokedLeases == {l \in Leases: leaseExp[l] # 0}
+    ActiveLeases    == {l \in Leases: leaseClients[l] # NULL}
     AvailableLeases == {l \in Leases: leaseExp[l] = NULL}
     AvailableKeys   == {k \in Keys: kvstore[k] = NULL}
+    RefreshableLeases(c) == {l \in clientLeases[c]: refreshes[l] < MaxRefresh}
 end define;
 
-macro revoke(l) begin
-    kvstore := [b \in leaseKeys[l] |-> NULL] @@ kvstore;
-    leaseKeys[l] := {};
-    leaseExp[l] := NULL;
-    leaseClients[l] := NULL;
+macro revoke(expired) begin
+    kvstore := [l \in UNION {leaseKeys[l]: l \in expired} |-> NULL] @@ kvstore;
+    clientLeases := [c \in Clients |-> clientLeases[c] \ {expired}] @@ clientLeases;
+    leaseClients := [l \in expired |-> NULL] @@ leaseClients;
+    leaseKeys := [l \in expired |-> {}] @@ leaseKeys;
+    \* Note: resetting leaseExp to 0 rather than NULL prevents leases from being reacquired
+    leaseExp := [l \in expired |-> 0] @@ leaseExp;
 end macro;
 
 fair process client \in Clients
@@ -48,20 +51,14 @@ begin
             end with;
         or
             \* Lease Refresh
-            with l \in clientLeases[self] do
-                if refreshes[l] > 5 then
-                    clientLeases[self] := clientLeases[self] \ {l};
-                    leaseClients[l] := NULL;
-                else
-                    leaseExp[l] := epoch + 10;
-                    refreshes[l] := refreshes[l] + 1;
-                end if;
+            with l \in RefreshableLeases(self) do
+                leaseExp[l] := epoch + 10;
+                refreshes[l] := refreshes[l] + 1;
             end with;
         or
             \* Lease Revoke
-            with l \in clientLeases[self] do
-                revoke(l);
-                clientLeases[self] := clientLeases[self] \ {l};
+            with l1 \in clientLeases[self] do
+                revoke({l1});
             end with;
         end either;
         if clientLeases[self] # {} \/ wants # {} then
@@ -75,24 +72,22 @@ variables
 begin
     Tick:
         epoch := epoch + 1;
-        expired := {l \in Leases: leaseExp[l] = epoch};
-        kvstore := [l \in UNION {leaseKeys[l]: l \in expired} |-> NULL] @@ kvstore;
-        clientLeases := [c \in Clients |-> clientLeases[c] \ {expired}] @@ clientLeases;
-        leaseClients := [l \in expired |-> NULL] @@ leaseClients;
-        leaseKeys := [l \in expired |-> {}] @@ leaseKeys;
-        leaseExp := [l \in expired |-> NULL] @@ leaseExp;
-        goto Tick;
+        revoke({l \in Leases: leaseExp[l] = epoch});
+        if AvailableLeases # {} /\ ActiveLeases # {} then
+            goto Tick;
+        end if;
 end process;
 
 end algorithm;*)
-\* BEGIN TRANSLATION (chksum(pcal) = "186f05ae" /\ chksum(tla) = "c06acaed")
+\* BEGIN TRANSLATION (chksum(pcal) = "bf2156bb" /\ chksum(tla) = "8b7bbe4e")
 VARIABLES kvstore, leaseKeys, leaseExp, refreshes, leaseClients, clientLeases,
     epoch, pc
 
 (* define statement *)
-UnRevokedLeases == {l \in Leases: leaseExp[l] /= 0}
+ActiveLeases == {l \in Leases: leaseClients[l] /= NULL}
 AvailableLeases == {l \in Leases: leaseExp[l] = NULL}
 AvailableKeys == {k \in Keys: kvstore[k] = NULL}
+RefreshableLeases(c) == {l \in clientLeases[c]: refreshes[l] < MaxRefresh}
 
 VARIABLES wants, expired
 
@@ -132,24 +127,17 @@ Client(self) ==
                     /\ leaseExp' = [leaseExp EXCEPT ![l] = epoch + 10]
                 /\ UNCHANGED << kvstore, leaseKeys, refreshes >>
         \/
-                /\ \E l \in clientLeases[self]:
-                    IF refreshes[l] > 5
-                    THEN
-                        /\ clientLeases' = [clientLeases EXCEPT ![self] = clientLeases[self] \ {l}]
-                        /\ leaseClients' = [leaseClients EXCEPT ![l] = NULL]
-                        /\ UNCHANGED << leaseExp, refreshes >>
-                    ELSE
-                        /\ leaseExp' = [leaseExp EXCEPT ![l] = epoch + 10]
-                        /\ refreshes' = [refreshes EXCEPT ![l] = refreshes[l] + 1]
-                        /\ UNCHANGED << leaseClients, clientLeases >>
-                /\ UNCHANGED << kvstore, leaseKeys >>
+                /\ \E l \in RefreshableLeases(self):
+                    /\ leaseExp' = [leaseExp EXCEPT ![l] = epoch + 10]
+                    /\ refreshes' = [refreshes EXCEPT ![l] = refreshes[l] + 1]
+                /\ UNCHANGED << kvstore, leaseKeys, leaseClients, clientLeases >>
         \/
-                /\ \E l \in clientLeases[self]:
-                    /\ kvstore' = [b \in leaseKeys[l] |-> NULL] @@ kvstore
-                    /\ leaseKeys' = [leaseKeys EXCEPT ![l] = {}]
-                    /\ leaseExp' = [leaseExp EXCEPT ![l] = NULL]
-                    /\ leaseClients' = [leaseClients EXCEPT ![l] = NULL]
-                    /\ clientLeases' = [clientLeases EXCEPT ![self] = clientLeases[self] \ {l}]
+                /\ \E l1 \in clientLeases[self]:
+                    /\ kvstore' = [l \in UNION {leaseKeys[l]: l \in ({l1})} |-> NULL] @@ kvstore
+                    /\ clientLeases' = [c \in Clients |-> clientLeases[c] \ {({l1})}] @@ clientLeases
+                    /\ leaseClients' = [l \in ({l1}) |-> NULL] @@ leaseClients
+                    /\ leaseKeys' = [l \in ({l1}) |-> {}] @@ leaseKeys
+                    /\ leaseExp' = [l \in ({l1}) |-> 0] @@ leaseExp
                 /\ UNCHANGED refreshes
     /\ IF clientLeases' [self] /= {} \/ wants[self] /= {}
         THEN
@@ -163,14 +151,17 @@ client(self) == Client(self)
 Tick ==
     /\ pc["tick"] = "Tick"
     /\ epoch' = epoch + 1
-    /\ expired' = {l \in Leases: leaseExp[l] = epoch'}
-    /\ kvstore' = [l \in UNION {leaseKeys[l]: l \in expired'} |-> NULL] @@ kvstore
-    /\ clientLeases' = [c \in Clients |-> clientLeases[c] \ {expired'}] @@ clientLeases
-    /\ leaseClients' = [l \in expired' |-> NULL] @@ leaseClients
-    /\ leaseKeys' = [l \in expired' |-> {}] @@ leaseKeys
-    /\ leaseExp' = [l \in expired' |-> NULL] @@ leaseExp
-    /\ pc' = [pc EXCEPT !["tick"] = "Tick"]
-    /\ UNCHANGED << refreshes, wants >>
+    /\ kvstore' = [l \in UNION {leaseKeys[l]: l \in ({l \in Leases: leaseExp[l] = epoch'})} |-> NULL] @@ kvstore
+    /\ clientLeases' = [c \in Clients |-> clientLeases[c] \ {({l \in Leases: leaseExp[l] = epoch'})}] @@ clientLeases
+    /\ leaseClients' = [l \in ({l \in Leases: leaseExp[l] = epoch'}) |-> NULL] @@ leaseClients
+    /\ leaseKeys' = [l \in ({l \in Leases: leaseExp[l] = epoch'}) |-> {}] @@ leaseKeys
+    /\ leaseExp' = [l \in ({l \in Leases: leaseExp[l] = epoch'}) |-> 0] @@ leaseExp
+    /\ IF AvailableLeases /= {} /\ ActiveLeases /= {}
+        THEN
+            /\ pc' = [pc EXCEPT !["tick"] = "Tick"]
+        ELSE
+            /\ pc' = [pc EXCEPT !["tick"] = "Done"]
+    /\ UNCHANGED << refreshes, wants, expired >>
 
 tick == Tick
 
